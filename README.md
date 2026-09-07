@@ -3,7 +3,7 @@
 Experimental HACS custom integration connecting Tuya/Zosung Zigbee IR blasters
 through Zigbee2MQTT to native Home Assistant entities. Domain: `tuya_ir_bridge`.
 
-**0.1.0 is a developer scaffold, not universal hardware support.** It generates
+**0.1.1 is a developer scaffold, not universal hardware support.** It generates
 timings dynamically, but has not been tested in a running Home Assistant instance
 or against physical blasters. Do not assume every Tuya device uses this format.
 
@@ -29,6 +29,11 @@ creation scaffold, not a full copy of the Tasmota editor's features. Lit convers
 can follow once the backend contract is stable.
 
 ## Install
+
+Updating from 0.1.0: update the integration files, restart Home Assistant, then
+reload the panel page. Version 0.1.1 fixes the administrator check that caused
+"Unknown error" when listing or creating devices. Climate still offers Electra
+only; select Remote, Media Player or Light to see NEC and Samsung32.
 
 1. Configure MQTT and Zigbee2MQTT and confirm the blaster exposes `ir_code_to_send`.
 2. Once published, add this repository in HACS as a custom **Integration** repository;
@@ -128,6 +133,7 @@ New algorithms should ship through reviewed integration releases.
 python -m unittest discover -s tests -v
 python -m compileall -q custom_components
 node --check custom_components/tuya_ir_bridge/www/manager.js
+node --test tests/panel.test.cjs
 ```
 
 These check wire layout/codec boundaries and syntax, not HA lifecycle, browser

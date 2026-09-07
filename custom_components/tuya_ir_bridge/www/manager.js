@@ -1,12 +1,18 @@
 /* Device manager; CSS reused under MIT from Tasmota IR Ready. */
 import {CSS} from './panel.js';
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const errorText = error => {
+  const detail = error?.error || error;
+  if (detail?.code === 'unknown_error') return 'Home Assistant could not complete the request. Check Settings → System → Logs for tuya_ir_bridge, and ensure the integration is updated and Home Assistant has restarted.';
+  if (detail?.code === 'unauthorized') return 'Sign in with a Home Assistant administrator account to manage IR devices.';
+  return detail?.message || String(detail || 'Request failed. Please try again.');
+};
 class ZigbeeIRPanel extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); this.devices=[]; }
   set hass(value) { this._hass=value; if (!this.started) { this.started=true; this.render(); this.refresh(); } }
   async refresh() {
-    try { this.devices=await this._hass.callWS({type:'tuya_ir_bridge/list'}); this.render(); }
-    catch(error) { this.status(error.message || String(error)); }
+    try { this.devices=await this._hass.callWS({type:'tuya_ir_bridge/list'}); this.render(); return true; }
+    catch(error) { this.status(errorText(error)); return false; }
   }
   status(message) { this.shadowRoot.querySelector('.statusbar').textContent=message; }
   render() {
@@ -28,14 +34,16 @@ class ZigbeeIRPanel extends HTMLElement {
       <div id="commands" hidden><div class="field-row"><label class="field-label" for="address">Protocol Address</label><input class="field-input" type="number" id="address" name="address" min="0" max="255" value="0"></div>
       <div class="field-row"><label class="field-label" for="command_map">Named Command IDs</label><textarea class="field-input" id="command_map" name="command_map" placeholder='{"turn_on": 1, "turn_off": 2}'></textarea></div>
       <p class="help">Enter documented numeric command IDs for your model. Protocol selection alone cannot determine which number means power or volume. No learned Base64 codes are stored.</p></div>
-      <p class="help" id="climate_note">Electra: 16–32°C, mode and fan control. Hardware validation is pending. Other AC families require separate encoder ports.</p>
+      <p class="help" id="climate_note">Climate currently supports Electra AC only (16–32°C, mode and fan). Gree, Mitsubishi and Daikin are not implemented yet. Select Media Player, Remote or Light above for NEC and Samsung32. Hardware validation is pending.</p>
       <button type="submit">Create Device</button></form></div></div><div class="statusbar status-info" role="status" aria-live="polite"></div>`;
     this.shadowRoot.querySelector('#menu').onclick=()=>this.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
     this.shadowRoot.querySelector('#refresh').onclick=()=>this.refresh();
     const form=this.shadowRoot.querySelector('form');
-    form.device_type.onchange=()=>{
-      const climate=form.device_type.value==='climate';
-      form.protocol.innerHTML=climate?'<option value="electra">Electra AC (experimental)</option>':'<option value="nec">NEC</option><option value="samsung">Samsung32</option>';
+    const deviceType=form.elements.namedItem('device_type');
+    const protocol=form.elements.namedItem('protocol');
+    deviceType.onchange=()=>{
+      const climate=deviceType.value==='climate';
+      protocol.innerHTML=climate?'<option value="electra">Electra AC (experimental)</option>':'<option value="nec">NEC</option><option value="samsung">Samsung32</option>';
       this.shadowRoot.querySelector('#commands').hidden=climate;
       this.shadowRoot.querySelector('#climate_note').hidden=!climate;
     };
@@ -46,9 +54,10 @@ class ZigbeeIRPanel extends HTMLElement {
         const device={name:data.name,device_type:data.device_type,topic:data.topic.trim(),protocol:data.protocol};
         if(device.device_type!=='climate'){device.address=Number(data.address);device.commands=JSON.parse(data.command_map);}
         await this._hass.callWS({type:'tuya_ir_bridge/create',device});
-        await this.refresh(); this.status('Device created. Its native entity is available in Home Assistant.');
-      } catch(error) { this.status(error.message || String(error)); button.disabled=false; }
+        if (await this.refresh()) this.status('Device created. Its native entity is available in Home Assistant.');
+        else this.status('Device created, but the list could not refresh. Use Refresh to reload the list; do not create the device again.');
+      } catch(error) { this.status(errorText(error)); button.disabled=false; }
     };
   }
 }
-customElements.define('zigbee-ir-ready-panel',ZigbeeIRPanel);
+if (!customElements.get('zigbee-ir-ready-panel')) customElements.define('zigbee-ir-ready-panel',ZigbeeIRPanel);

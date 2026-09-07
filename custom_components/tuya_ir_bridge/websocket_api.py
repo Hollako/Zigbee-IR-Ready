@@ -1,13 +1,15 @@
 """Admin-only panel API; registry population is handled by entity platforms."""
 import voluptuous as vol
 from homeassistant.components import websocket_api
+from homeassistant.exceptions import Unauthorized
 from .const import DOMAIN
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/list"})
 @websocket_api.async_response
 async def list_devices(hass, connection, msg):
-    connection.require_admin()
+    if connection.user is None or not connection.user.is_admin:
+        raise Unauthorized
     hub = hass.data.get(DOMAIN)
     if hub is None:
         connection.send_error(msg["id"], "not_loaded", "Integration is not loaded")
@@ -18,7 +20,8 @@ async def list_devices(hass, connection, msg):
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/create", vol.Required("device"): dict})
 @websocket_api.async_response
 async def create_device(hass, connection, msg):
-    connection.require_admin()
+    if connection.user is None or not connection.user.is_admin:
+        raise Unauthorized
     hub = hass.data.get(DOMAIN)
     if hub is None:
         connection.send_error(msg["id"], "not_loaded", "Integration is not loaded")

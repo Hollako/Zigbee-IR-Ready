@@ -17,3 +17,4 @@ jobs:
           node-version: '22'
       - run: node --check custom_components/tuya_ir_bridge/www/panel.js
       - run: node --check custom_components/tuya_ir_bridge/www/manager.js
+      - run: node --test tests/panel.test.cjs
