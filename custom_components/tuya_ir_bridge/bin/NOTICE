@@ -1,0 +1,12 @@
+Zigbee IR Ready native engine — LGPL-2.1-or-later (see LICENSE).
+IRremoteESP8266: Copyright Ken Shirriff, Mark Szabo, David Conran and respective
+upstream file authors. Host adapter and capture changes: Copyright 2026 Hollako.
+JSON parser: nlohmann/json 3.11.3, MIT (see LICENSE-nlohmann).
+
+Complete corresponding source, modifications, and rebuild instructions:
+https://github.com/Hollako/Zigbee-IR-Ready/tree/v0.2.0/engine
+Upstream source revision: 1e2f0f3ef0a93cbf2a8ddb2e95130f8f4c584b3f
+The source archive and JSON header are included in the repository at that tag.
+You may modify and rebuild the helper; the build regenerates checksums.
+
+This software is distributed without any warranty. See the license texts.
