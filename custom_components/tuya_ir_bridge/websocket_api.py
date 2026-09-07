@@ -37,3 +37,16 @@ async def create_device(hass, connection, msg):
 def register_commands(hass):
     websocket_api.async_register_command(hass, list_devices)
     websocket_api.async_register_command(hass, create_device)
+    websocket_api.async_register_command(hass, catalogue)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/catalogue"})
+@websocket_api.async_response
+async def catalogue(hass, connection, msg):
+    if connection.user is None or not connection.user.is_admin:
+        raise Unauthorized
+    hub = hass.data.get(DOMAIN)
+    if hub is None:
+        connection.send_error(msg["id"], "not_loaded", "Integration is not loaded")
+        return
+    connection.send_result(msg["id"], hub.catalogue)

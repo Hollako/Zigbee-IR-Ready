@@ -1,0 +1,33 @@
+irsend:
+  name: Send IR command
+  description: Generate a protocol command using the bundled IRremoteESP8266 engine.
+  fields:
+    entity_id:
+      name: IR device
+      required: true
+      selector:
+        entity:
+          integration: tuya_ir_bridge
+    command:
+      name: IRsend command
+      description: 'Example: {"Protocol":"NEC","Bits":32,"Data":"0x20DF10EF","Repeat":0}. RAW accepts Frequency and a Data timing array.'
+      required: true
+      selector:
+        object:
+irhvac:
+  name: Send HVAC state
+  description: Send state and optional features to a configured climate device.
+  fields:
+    entity_id:
+      name: Climate device
+      required: true
+      selector:
+        entity:
+          integration: tuya_ir_bridge
+          domain: climate
+    command:
+      name: IRhvac state
+      description: 'Example: {"Power":true,"Mode":"Cool","Temp":24,"FanSpeed":"Auto","SwingV":"Auto"}.'
+      required: true
+      selector:
+        object:

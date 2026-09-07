@@ -6,7 +6,17 @@ of IRremoteESP8266 src/ir_Electra.cpp and src/ir_Electra.h.
 Copyright 2018-2021 David Conran. LGPL-2.1-or-later.
 https://github.com/crankyoldgit/IRremoteESP8266
 The Python source is provided in full and may be modified and redistributed
-under the license. No upstream C++ is downloaded or executed at runtime.
+under the license.
+
+Version 0.2.0 also compiles IRremoteESP8266 itself for local host use.
+Copyright Ken Shirriff, Mark Szabo, David Conran and respective file authors.
+Exact revision and corresponding source: engine/upstream.json and
+engine/vendor/IRremoteESP8266-source.tar.gz. Host capture changes are documented
+in engine/build.py (2026-09-07). Adapter source is included. The executable runs
+upstream algorithms locally; no code or binaries are downloaded at runtime.
+
+The native adapter uses nlohmann/json 3.11.3, Copyright 2013-2023 Niels Lohmann,
+MIT license: engine/vendor/nlohmann/LICENSE.MIT. Header source is included.
 
 Panel CSS adapted from Hollako/Tasmota-IR-Ready, Copyright 2026 Hollako,
 under MIT. Original permission notice: licenses/Tasmota-MIT.txt.

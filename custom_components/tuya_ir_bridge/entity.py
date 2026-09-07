@@ -1,7 +1,6 @@
 """Registry-backed virtual entity base. State is optimistic."""
 from homeassistant.helpers.entity import Entity, DeviceInfo
 from .const import DOMAIN
-from .protocols import encode_command
 
 
 class IREntity(Entity):
@@ -18,14 +17,21 @@ class IREntity(Entity):
             manufacturer="Zigbee IR Ready", model=device["protocol"],
         )
 
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self.hub.entities[self.entity_id] = self
+
+    async def async_will_remove_from_hass(self):
+        self.hub.entities.pop(self.entity_id, None)
+        await super().async_will_remove_from_hass()
+
     async def send_command(self, name):
         from homeassistant.exceptions import HomeAssistantError
         try:
-            command = self.device.get("commands", {})[name]
-            raw = encode_command(self.device["protocol"], self.device.get("address", 0), command)
+            signal = await self.hub.command(self.device, name)
         except (KeyError, ValueError) as err:
-            raise HomeAssistantError(f"Unsupported command: {name}") from err
-        await self.hub.send(self.device, raw)
+            raise HomeAssistantError(f"Cannot encode {name}: {err}") from err
+        await self.hub.send(self.device, signal)
 
 
 def setup_platform(hass, entry, async_add_entities, kind, factory):

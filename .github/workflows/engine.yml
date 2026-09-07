@@ -1,0 +1,23 @@
+name: Build bundled IR engine
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y g++ g++-aarch64-linux-gnu
+      - name: Unpack corresponding source
+        run: |
+          mkdir -p .build
+          tar -xzf engine/vendor/IRremoteESP8266-source.tar.gz -C .build
+      - run: python3 engine/build.py .build/IRremoteESP8266 amd64
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 engine/build.py .build/IRremoteESP8266 aarch64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ir-engine-binaries
+          path: custom_components/tuya_ir_bridge/bin/

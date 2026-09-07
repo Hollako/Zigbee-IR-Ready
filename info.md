@@ -1,8 +1,9 @@
 # Zigbee IR Ready
 
-Experimental Tuya/Zosung Zigbee2MQTT IR bridge with a Tasmota IR Ready-style
-sidebar. Dynamic Electra AC, NEC and Samsung encoders; native Climate, Remote,
-Media Player and Light entity scaffolds. Requires MQTT and compatible hardware.
+HACS-only Tuya/Zosung Zigbee2MQTT bridge with the bundled IRremoteESP8266 engine.
+Generates HVAC state and general IRsend signals locally. Native Climate, Remote,
+Media Player and Light entities, with a Tasmota-style sidebar.
 
-This preview is not universal and has not passed live Home Assistant or hardware
-validation. Read the README support matrix before installation.
+Requires 64-bit Linux HA, MQTT and a compatible blaster. No additional app,
+container or compiler installation. Read the README transport limitations;
+broad encoder coverage is not hardware certification.
