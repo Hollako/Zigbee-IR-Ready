@@ -1,0 +1,15 @@
+Zigbee IR Ready — Copyright 2026 Hollako.
+Distributed under LGPL-2.1-or-later; see LICENSE.
+
+The Electra encoder in protocols.py is a Python adaptation (2026-09-07)
+of IRremoteESP8266 src/ir_Electra.cpp and src/ir_Electra.h.
+Copyright 2018-2021 David Conran. LGPL-2.1-or-later.
+https://github.com/crankyoldgit/IRremoteESP8266
+The Python source is provided in full and may be modified and redistributed
+under the license. No upstream C++ is downloaded or executed at runtime.
+
+Panel CSS adapted from Hollako/Tasmota-IR-Ready, Copyright 2026 Hollako,
+under MIT. Original permission notice: licenses/Tasmota-MIT.txt.
+
+Tuya serialization is independently implemented to match the documented
+literal-stream format used by zigbee-herdsman-converters src/lib/zosung.ts.

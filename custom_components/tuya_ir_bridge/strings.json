@@ -1,0 +1,1 @@
+{"title":"Zigbee IR Ready","config":{"step":{"user":{"title":"Zigbee IR Ready","description":"Create the bridge, then open Zigbee IR Ready in the sidebar to add devices. MQTT and Zigbee2MQTT must already be configured."}},"abort":{"already_configured":"The bridge is already configured."}}}
