@@ -34,7 +34,11 @@ def prepare_signal(result, transport="zosung"):
             raise ValueError(f"Protocol needs {frequency} Hz. Select carrier-aware Zosung transport")
         payload = encoded
     elif transport == "zosung":
-        payload = json.dumps({"key_num": 1, "delay": 300, "key1": {"num": 1, "freq": frequency, "type": 1, "key_code": encoded}})
+        message = json.dumps({"key_num": 1, "delay": 300, "key1": {"num": 1, "freq": frequency, "type": 1, "key_code": encoded}})
+        # Z2M JSON-parses values on /set/ir_code_to_send. Encode a JSON string
+        # so the converter receives the full message as text, not an object
+        # that some converter versions turn into "[object Object]".
+        payload = json.dumps(message)
     else:
         raise ValueError("Unknown transport")
     return payload, duration

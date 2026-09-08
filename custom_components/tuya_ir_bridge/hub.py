@@ -5,7 +5,7 @@ from uuid import uuid4
 from homeassistant.components import mqtt
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers import device_registry as dr
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN, DEVICE_TYPES, HVAC_MODES, FAN_MODES, SWING_MODES, FEATURES
 from .native import NativeEngine
 from .protocols import encode_command
 from .signal import prepare_signal
@@ -15,7 +15,7 @@ from .commands import normalize_hvac, normalize_keys
 def validate_device(data, catalogue):
     if not isinstance(data, dict):
         raise ValueError("Device must be an object")
-    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step"}
+    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes"}
     if set(data) - allowed:
         raise ValueError("Unknown device fields")
     data = copy.deepcopy(data)
@@ -23,7 +23,7 @@ def validate_device(data, catalogue):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Missing {key}")
     data["name"] = data["name"].strip()
-    if len(data["name"]) > 100 or data["device_type"] not in PLATFORMS:
+    if len(data["name"]) > 100 or data["device_type"] not in DEVICE_TYPES:
         raise ValueError("Invalid name or device type")
     topic = data["topic"]
     if len(topic) > 512 or any(c in topic for c in ("+", "#", "\x00")) or not topic.endswith("/set/ir_code_to_send"):
@@ -36,6 +36,15 @@ def validate_device(data, catalogue):
         protocol = "ELECTRA_AC"
     data["protocol"] = protocol
     if data["device_type"] == "climate":
+        for key, choices, default in (("hvac_modes", HVAC_MODES, HVAC_MODES), ("fan_modes", FAN_MODES, FAN_MODES), ("swing_modes", SWING_MODES, []), ("feature_switches", FEATURES, [])):
+            values = data.get(key, default)
+            if not isinstance(values, list) or any(not isinstance(v, str) or v not in choices for v in values) or len(set(values)) != len(values):
+                raise ValueError(f"Invalid {key}")
+            data[key] = list(values)
+        if "off" not in data["hvac_modes"] or len(data["hvac_modes"]) < 2:
+            raise ValueError("Select Off and at least one active HVAC mode")
+        if type(data.get("sleep_minutes", 0)) is not int or not 0 <= data.get("sleep_minutes", 0) <= 1440:
+            raise ValueError("Sleep minutes must be 0..1440")
         if protocol not in catalogue["climate"]:
             raise ValueError("Protocol is not supported by the bundled HVAC engine")
         model = data.get("model", -1)
@@ -72,6 +81,9 @@ class Hub:
         self.store = Store(hass, 1, f"{DOMAIN}.devices")
         self.devices, self.adders, self.entities = [], {}, {}
         self.lock, self.tx_locks = asyncio.Lock(), {}
+        self.feature_entities, self.listeners = {}, set()
+        from .learning import LearningManager
+        self.learning = LearningManager(self)
         self.engine = NativeEngine()
 
     async def load(self):
@@ -97,6 +109,10 @@ class Hub:
             await self.store.async_save(updated)
             self.devices = updated
             self.adders[device["device_type"]](device)
+            if device["device_type"] == "media_player" and "remote" in self.adders:
+                self.adders["remote"](device)
+            if device["device_type"] == "climate" and "switch" in self.adders:
+                self.adders["switch"](device)
         return device
 
     async def validate_encoding(self, device):
@@ -117,7 +133,7 @@ class Hub:
                 raise ValueError("Device type cannot be changed; create a separate device for a different type")
             await self.validate_encoding(device)
             device["id"] = device_id
-            entity = next((e for e in self.entities.values() if e.device["id"] == device_id), None)
+            entity = self.primary_entity(device_id)
             # Wait for an in-flight command before replacing its parameters.
             async with entity._command_lock if entity else asyncio.Lock():
                 updated = [device if d["id"] == device_id else d for d in self.devices]
@@ -129,7 +145,20 @@ class Hub:
                     registry.async_update_device(registered.id, name=device["name"], model=device["protocol"])
                 if entity:
                     entity.apply_device(device)
+                for companion in self.entities.values():
+                    if companion is not entity and companion.device["id"] == device_id:
+                        companion.apply_device(device)
+                if device["device_type"] == "climate" and "switch" in self.adders:
+                    self.adders["switch"](device)
+                self.notify()
         return device
+
+    def notify(self):
+        for listener in tuple(self.listeners):
+            listener()
+
+    def primary_entity(self, device_id):
+        return next((e for e in self.entities.values() if e.unique_id == device_id), None)
 
     async def hvac(self, device, state, previous=None):
         protocol = device["protocol"].upper()
@@ -142,6 +171,12 @@ class Hub:
 
     async def command(self, device, name):
         command = device["commands"][name]
+        if isinstance(command, dict) and "Learned" in command:
+            from .codec import tuya_to_raw
+            if set(command) != {"Learned"}:
+                raise ValueError("A learned command only accepts Learned")
+            raw = tuya_to_raw(command["Learned"])
+            return {"pulses": [[v if i % 2 == 0 else -v, 38000, 50] for i, v in enumerate(raw)]}
         if type(command) is int:
             # Preserve 0.1.x address/command-ID configurations exactly.
             raw = encode_command(device["protocol"].lower(), device.get("address", 0), command)
@@ -187,5 +222,7 @@ class Hub:
         payload, duration = prepare_signal(signal, device.get("transport", "base64"))
         topic = device["topic"]
         async with self.tx_locks.setdefault(topic, asyncio.Lock()):
+            if any(s["topic"] == topic and s["status"] == "waiting" for s in self.learning.sessions.values()):
+                raise ValueError("The blaster is learning. Finish or cancel learning before sending")
             await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
             await asyncio.sleep(max(0.5, duration + 0.1))

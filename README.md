@@ -53,16 +53,24 @@ There are no runtime source or binary downloads.
 complete JSON IR messages on `ir_code_to_send`. Use this for protocols requiring
 36 kHz or 40 kHz. Your blaster must physically support the requested carrier.
 
+The MQTT payload is a JSON-encoded string containing the complete message.
+Outer quotes and escaped inner quotes are intentional: Zigbee2MQTT parses the
+MQTT value first, then the Zosung converter parses the resulting string.
+
 **Legacy Base64** sends only the generated Base64 string. The converter supplies
 38 kHz. Other carrier frequencies are rejected instead of silently changed.
 
-Both publish to `zigbee2mqtt/<friendly name>/set/ir_code_to_send`, without retained
+Both publish to `<base topic>/<friendly name>/set/ir_code_to_send`, without retained
 messages. Native signed mark/space durations are merged before uint16 little-endian
 / FastLZ literal framing / Base64 conversion. Trailing silence is removed from
 the packet and retained for pacing. Internal durations above 65535 µs, changing
 carriers, signals beginning with a space, and oversized signals are rejected;
 they are never clamped. Sends sharing a topic are serialized. MQTT publication
 does not confirm physical IR delivery.
+
+Use the exact, case-sensitive MQTT base topic configured in Zigbee2MQTT. For
+example, a device shown as `Zigbee/Master Room IR` needs
+`Zigbee/Master Room IR/set/ir_code_to_send`.
 
 ## Climate
 
@@ -135,9 +143,48 @@ gaps in some MIDEA, CARRIER_AC40 and MULTIBRACKETS requests, and an upstream YOR
 common-HVAC dispatch failure. Other entries need specific models/state lengths.
 Physical testing remains necessary.
 
-The panel reuses Tasmota IR Ready toolbar/sidebar styling with a vanilla Web
-Component. Automatic blaster discovery, deletion and richer media controls
-remain future work. This is not yet a full replica of the Tasmota editor.
+The panel adapts the Tasmota IR Ready editor and remote card. Automatic blaster
+discovery, device deletion, source-cycle tracking and online profile browsing
+remain future work. It is not a complete replica of every Tasmota feature.
+
+### Tabbed editor, learning and remotes (0.3.0)
+
+- **Climate → Capabilities:** select the HVAC modes, fan speeds and swing
+  positions exposed in Home Assistant. Off is always included. Select no fan or
+  swing options to hide those controls. These choices describe your appliance;
+  they cannot add hardware features absent from its protocol.
+- **Climate → Behavior & Switches:** choose individual feature switches, grouped
+  under the same Home Assistant device. They change the current IR state, which
+  is reused by later commands. Initial feature values only seed that state.
+  Deselecting a feature makes its existing switch unavailable, preserving its
+  identity if you enable it again. Sleep uses the configured minutes (0 means
+  the protocol's default). IR feature state is optimistic.
+- **Remote / Media / Light:** edit commands in Power & Volume, Navigation,
+  Playback, Channels & Colors, Keypad, Sources and Custom Commands tabs.
+  Enter Bits and hexadecimal Data, or expand Advanced for full IRsend objects.
+  Direct source commands named `source:HDMI 1` become media-player sources.
+- **Learn:** point the original remote at the same Zigbee blaster and press a
+  button. Learning waits up to 30 seconds and ignores retained MQTT messages.
+  The captured code fills the command; **Test** transmits it, and **Save Changes**
+  persists it. Cancel stops waiting; the blaster's own learning window may stay
+  open until it times out. Learned commands use the Zosung 38 kHz assumption.
+  This is optional button learning, not a replacement for generated HVAC state.
+- **IR Remotes sidebar:** use the adapted Tasmota remote card with navigation,
+  volume, keypad, source and custom buttons. Media players also receive a
+  companion `remote` entity. Only configured commands appear. Media-player
+  capabilities are enabled from configured commands; power-on/off are required.
+
+The remote card can also be used in a dashboard by adding
+`/tuya_ir_bridge_static/remote_card.js` as a JavaScript module resource and using:
+
+```yaml
+type: custom:zigbee-ir-ready-remote-card
+entity: remote.living_room_tv
+```
+
+The sidebar loads its resources automatically. Backend learning/switch tests
+and browser tests use mocked MQTT and HA services; physical validation of these
+new features is still needed. Restart Home Assistant after updating to 0.3.0.
 
 ### Editing an existing device
 

@@ -31,3 +31,43 @@ def raw_hex_to_tuya(value: str) -> str:
     if len(data) % 2:
         raise ValueError("Hex timing data must contain complete uint16 values")
     return raw_to_tuya([item[0] for item in struct.iter_unpack("<H", data)])
+
+
+def tuya_to_raw(value: str) -> list[int]:
+    """Decode bounded FastLZ level-1 learned timings, including back references."""
+    if not isinstance(value, str) or not 1 <= len(value) <= 16000:
+        raise ValueError("Invalid learned code length")
+    try:
+        data = base64.b64decode(value, validate=True)
+        output = bytearray()
+        pos = 0
+        while pos < len(data):
+            control = data[pos]
+            pos += 1
+            if control < 32:
+                length = control + 1
+                if pos + length > len(data):
+                    raise ValueError("Truncated literal")
+                output.extend(data[pos:pos + length])
+                pos += length
+            else:
+                length = (control >> 5) + 2
+                if length == 9:
+                    length += data[pos]
+                    pos += 1
+                distance = ((control & 31) << 8) + data[pos] + 1
+                pos += 1
+                if distance > len(output):
+                    raise ValueError("Invalid reference")
+                for _ in range(length):
+                    output.append(output[-distance])
+            if len(output) > 8192:
+                raise ValueError("Learned code exceeds 4096 timings")
+        if not output or len(output) % 2:
+            raise ValueError("Incomplete timings")
+        raw = [v[0] for v in struct.iter_unpack("<H", output)]
+        if any(v == 0 for v in raw):
+            raise ValueError("Zero timing")
+        return raw
+    except (IndexError, TypeError, ValueError) as err:
+        raise ValueError(f"Invalid learned Tuya code: {err}") from err

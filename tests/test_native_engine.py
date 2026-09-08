@@ -34,13 +34,26 @@ class TransportTests(unittest.TestCase):
     def test_carrier_and_terminal_gap(self):
         result={'pulses':[[2400,40000,33],[-600,40000,33],[1200,40000,33],[-100000,40000,33]]}
         payload,duration=signal.prepare_signal(result)
-        self.assertEqual(json.loads(payload)['key1']['freq'],40000)
+        # First parse is Zigbee2MQTT's attribute-topic MQTT handler.
+        converter_value=json.loads(payload)
+        self.assertIsInstance(converter_value,str)
+        self.assertEqual(json.loads(converter_value)['key1']['freq'],40000)
         self.assertAlmostEqual(duration,.1042)
         with self.assertRaises(ValueError): signal.prepare_signal(result,'base64')
 
     def test_internal_gap_not_silently_corrupted(self):
         with self.assertRaises(ValueError):
             signal.prepare_signal({'pulses':[[500,38000,50],[-100000,38000,50],[500,38000,50]]})
+
+    def test_zosung_mqtt_string_preserves_legacy_code(self):
+        result={'pulses':[[9166,38000,50],[-4470,38000,50],[646,38000,50]]}
+        legacy,_=signal.prepare_signal(result,'base64')
+        payload,_=signal.prepare_signal(result,'zosung')
+        converter_value=json.loads(payload)
+        self.assertIsInstance(converter_value,str)
+        message=json.loads(converter_value)
+        self.assertEqual(message,{'key_num':1,'delay':300,'key1':{
+            'num':1,'freq':38000,'type':1,'key_code':legacy}})
 
 
 @unittest.skipUnless(sys.platform=='linux' and BINARY.exists(), 'Bundled Linux engine required')

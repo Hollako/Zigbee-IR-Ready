@@ -35,15 +35,24 @@ async def async_setup_entry(hass, entry):
         hass, webcomponent_name="zigbee-ir-ready-panel",
         sidebar_title="Zigbee IR Ready", sidebar_icon="mdi:remote",
         frontend_url_path="zigbee-ir-ready",
-        module_url=f"/{DOMAIN}_static/manager.js?v=0.2.1",
+        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.0",
         embed_iframe=False, require_admin=True,
+    )
+    await panel_custom.async_register_panel(
+        hass, webcomponent_name="zigbee-ir-remotes-panel",
+        sidebar_title="IR Remotes", sidebar_icon="mdi:remote-tv",
+        frontend_url_path="zigbee-ir-remotes",
+        module_url=f"/{DOMAIN}_static/remote_panel.js?v=0.3.0",
+        embed_iframe=False, require_admin=False,
     )
     return True
 
 
 async def async_unload_entry(hass, entry):
+    await hass.data[DOMAIN].learning.close()
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     frontend.async_remove_panel(hass, "zigbee-ir-ready")
+    frontend.async_remove_panel(hass, "zigbee-ir-remotes")
     hass.data.pop(DOMAIN, None)
     return True

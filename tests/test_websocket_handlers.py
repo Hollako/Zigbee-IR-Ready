@@ -20,7 +20,7 @@ def handlers():
     tree.body = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)]
     for node in tree.body:
         node.decorator_list = []
-    namespace = {'DOMAIN': 'tuya_ir_bridge', 'Unauthorized': Unauthorized}
+    namespace = {'DOMAIN': 'tuya_ir_bridge', 'Unauthorized': Unauthorized, 'HomeAssistantError': RuntimeError}
     exec(compile(tree, str(source), 'exec'), namespace)
     return namespace
 
@@ -41,7 +41,7 @@ class WebsocketTests(unittest.IsolatedAsyncioTestCase):
     async def test_non_admin_rejected_before_access(self):
         api = handlers()
         for user in (None, SimpleNamespace(is_admin=False)):
-            for name in ('list_devices', 'create_device', 'catalogue', 'update_device'):
+            for name in ('list_devices', 'create_device', 'catalogue', 'update_device', 'panel_action'):
                 with self.assertRaises(Unauthorized):
                     await api[name](SimpleNamespace(data={}), SimpleNamespace(user=user), {'id': 1})
 

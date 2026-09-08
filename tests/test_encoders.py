@@ -16,6 +16,14 @@ def load(name):
 codec, protocols = load("codec"), load("protocols")
 
 class EncodingTests(unittest.TestCase):
+    def test_learned_back_reference_and_limits(self):
+        # Literal 560us followed by an overlapping two-byte-distance reference.
+        encoded=base64.b64encode(bytes.fromhex('0130024001')).decode()
+        self.assertEqual(codec.tuya_to_raw(encoded),[560,560,560])
+        raw=[9000,4500,560,1690]*25
+        self.assertEqual(codec.tuya_to_raw(codec.raw_to_tuya(raw)),raw)
+        for value in ('!!!','',base64.b64encode(bytes.fromhex('4001')).decode(),base64.b64encode(bytes.fromhex('0130')).decode()):
+            with self.assertRaises(ValueError): codec.tuya_to_raw(value)
     def test_fixed_payload(self):
         # Four uint16 LE values with a single 8-byte literal run.
         self.assertEqual(base64.b64decode(codec.raw_to_tuya([9000, 4500, 560, 1690])),

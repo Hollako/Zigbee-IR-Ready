@@ -5,6 +5,11 @@ from homeassistant.exceptions import HomeAssistantError
 from .entity import IREntity, setup_platform
 from homeassistant.helpers.restore_state import RestoreEntity
 from .commands import normalize_hvac
+from .const import HVAC_MODES, FAN_MODES, SWING_MODES
+
+SWING_VALUES = {"off": ("Off", "Off"), "vertical": ("Auto", "Off"), "horizontal": ("Off", "Auto"), "both": ("Auto", "Auto")}
+SWING_VALUES.update({key: (key.title(), "Off") for key in ("highest", "high", "middle", "low", "lowest")})
+SWING_VALUES.update({key: ("Off", "Middle" if key == "horizontal middle" else key.title()) for key in ("left max", "left", "horizontal middle", "right", "right max", "wide")})
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -29,6 +34,21 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         self._attr_max_temp = device.get("max_temp", 32 if device["protocol"].lower() in ("electra", "electra_ac") else 30)
         self._attr_target_temperature_step = device.get("temp_step", 1)
         self._attr_target_temperature = max(self._attr_min_temp, min(24, self._attr_max_temp))
+        self.configure_capabilities(device)
+
+    def configure_capabilities(self, device):
+        self._attr_hvac_modes = [HVACMode(v) for v in device.get("hvac_modes", HVAC_MODES)]
+        self._attr_fan_modes = device.get("fan_modes", FAN_MODES)
+        self._attr_swing_modes = device.get("swing_modes", [])
+        self._attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+        if self._attr_fan_modes:
+            self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
+        if self._attr_swing_modes:
+            self._attr_supported_features |= ClimateEntityFeature.SWING_MODE
+        if self._attr_hvac_mode not in self._attr_hvac_modes:
+            self._attr_hvac_mode = HVACMode.OFF
+        if self._attr_fan_mode not in self._attr_fan_modes:
+            self._attr_fan_mode = next(iter(self._attr_fan_modes), "auto")
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -39,6 +59,9 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
                 self._attr_hvac_mode = HVACMode(last.state)
             self._attr_target_temperature = last.attributes.get("temperature", 24)
             self._attr_fan_mode = last.attributes.get("fan_mode", "auto")
+        self.configure_capabilities(self.device)
+        self._attr_target_temperature = max(self.min_temp, min(self.target_temperature, self.max_temp))
+        self.hub.notify()
 
     @property
     def extra_state_attributes(self):
@@ -52,7 +75,30 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         self._attr_max_temp = device.get("max_temp", 32 if device["protocol"].lower() in ("electra", "electra_ac") else 30)
         self._attr_target_temperature_step = device.get("temp_step", 1)
         self._attr_target_temperature = max(self._attr_min_temp, min(self._attr_target_temperature, self._attr_max_temp))
+        self.configure_capabilities(device)
         super().apply_device(device)
+
+    @property
+    def swing_mode(self):
+        state = {**self.device.get("hvac_options", {}), **(self._previous or {})}
+        pair = (str(state.get("SwingV", "Off")).lower(), str(state.get("SwingH", "Off")).lower())
+        return next((key for key, values in SWING_VALUES.items() if key in self.swing_modes and tuple(v.lower() for v in values) == pair), None)
+
+    async def async_set_swing_mode(self, swing_mode):
+        if swing_mode not in self.swing_modes:
+            raise HomeAssistantError("Swing mode is not enabled for this device")
+        vertical, horizontal = SWING_VALUES[swing_mode]
+        await self._set(extra={"SwingV": vertical, "SwingH": horizontal})
+
+    async def async_set_feature(self, feature, enabled):
+        if feature not in self.device.get("feature_switches", []):
+            raise HomeAssistantError("Feature switch is not enabled")
+        value = enabled
+        if feature in ("SwingV", "SwingH"):
+            value = "Auto" if enabled else "Off"
+        elif feature == "Sleep":
+            value = self.device.get("sleep_minutes", 0) if enabled else -1
+        await self._set(extra={feature: value})
 
     async def _set(self, mode=None, temperature=None, fan=None, extra=None):
         async with self._command_lock:
@@ -62,7 +108,7 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
             try:
                 if isinstance(temperature, bool) or not self.min_temp <= temperature <= self.max_temp:
                     raise ValueError("Temperature outside configured device range")
-                if mode not in self.hvac_modes or fan not in self.fan_modes:
+                if mode not in self.hvac_modes or (self.fan_modes and fan not in self.fan_modes):
                     raise ValueError("Invalid mode or fan speed")
                 state = {**(self._previous or {}), **(extra or {}), "Power": mode != HVACMode.OFF, "Mode": "fan" if mode == HVACMode.FAN_ONLY else mode,
                          "Temp": temperature, "FanSpeed": fan}
@@ -73,6 +119,7 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
             self._previous = state
             self._attr_hvac_mode, self._attr_target_temperature, self._attr_fan_mode = mode, temperature, fan
             self.async_write_ha_state()
+            self.hub.notify()
 
     async def async_set_temperature(self, **kwargs):
         await self._set(mode=kwargs.get("hvac_mode"), temperature=kwargs.get(ATTR_TEMPERATURE))
@@ -101,7 +148,7 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         if power is False:
             mode = HVACMode.OFF
         elif power is True and mode is None and self.hvac_mode == HVACMode.OFF:
-            mode = HVACMode.AUTO
+            mode = next(v for v in self.hvac_modes if v != HVACMode.OFF)
         temperature = command.pop("Temp", None)
         fan = command.pop("FanSpeed", None)
         if fan is not None:

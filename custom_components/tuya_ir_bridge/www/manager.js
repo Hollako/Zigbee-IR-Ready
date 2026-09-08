@@ -1,5 +1,6 @@
 /* Device manager; CSS reused under MIT from Tasmota IR Ready. */
 import {CSS} from './panel.js';
+import {mountEditor} from './editor.js';
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const errorText = error => {
   const detail = error?.error || error;
@@ -15,10 +16,11 @@ class ZigbeeIRPanel extends HTMLElement {
     if (!this.started) { this.started=true; this.render(); this.refresh(); }
   }
   selectDevice(id) {
-    if (this.saving) return;
+    if (this.saving || this.learning) return;
     this.selectedId=id; this.draft=null; this.render();
   }
   async refresh() {
+    if(this.learning)return false;
     try {
       const [devices,catalogue]=await Promise.all([
         this._hass.callWS({type:'tuya_ir_bridge/list'}),
@@ -29,6 +31,7 @@ class ZigbeeIRPanel extends HTMLElement {
     catch(error) { this.status(errorText(error)); return false; }
   }
   status(message) { this.shadowRoot.querySelector('.statusbar').textContent=message; }
+  disconnectedCallback() { this.cancelLearning?.(); }
   render() {
     const selected=this.devices.find(device=>device.id===this.selectedId);
     const editing=!!selected;
@@ -43,6 +46,9 @@ class ZigbeeIRPanel extends HTMLElement {
       button.sidebar-item.active{color:var(--text-primary-color,#fff);background:var(--primary-color,#03a9f4)}
       .sidebar-item small{margin-left:auto} .form-actions{display:flex;gap:12px}
       fieldset{border:0;padding:0;margin:0;min-width:0}
+      .command-inputs{display:grid;grid-template-columns:180px 90px minmax(160px,1fr);gap:12px;align-items:end;margin:10px 0}.command-inputs label{font-size:13px;display:grid;gap:6px}.command-inputs input,.command-inputs select{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--divider-color,#666);border-radius:5px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}.command-row>label{font-weight:600}.command-row details{margin:12px 0;color:var(--secondary-text-color,#aaa)}.command-row summary{cursor:pointer}.command-row button{border:0;border-radius:5px;padding:10px 18px;background:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}@media(max-width:600px){.command-inputs{grid-template-columns:1fr}.editor-tabs{gap:4px}}
+      [hidden]{display:none!important}.editor-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0}.editor-tabs button{padding:10px;border:1px solid var(--divider-color,#777);background:var(--card-background-color,#fff);color:var(--primary-text-color,#222);border-radius:6px}.editor-tabs [aria-selected=true]{background:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}
+      .choice{display:inline-flex;align-items:center;gap:6px;padding:8px}.choice-group{margin-bottom:18px}.command-row{padding:12px 0;border-bottom:1px solid var(--divider-color,#777)}.command-row label{display:block}.command-row textarea{display:block;width:100%;box-sizing:border-box;min-height:60px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}.command-row button,.remote-key{margin:6px;padding:10px}.learning-overlay{position:fixed;inset:0;background:#0009;display:grid;place-items:center;z-index:10}.learning-overlay>div{background:var(--card-background-color,#fff);color:var(--primary-text-color,#222);padding:30px;max-width:400px}.form-actions{margin-top:20px}
       textarea{min-height:100px} .help{color:var(--secondary-text-color);line-height:1.6}
       @media(max-width:600px){.field-label{width:100%}.main{padding:12px}}
       </style>
@@ -106,13 +112,15 @@ class ZigbeeIRPanel extends HTMLElement {
     if(values.protocol) {protocol.value=values.protocol;protocol.onchange();}
     const legacy=!!selected && Object.values(selected.commands || {}).some(value=>typeof value==='number');
     this.shadowRoot.querySelector('#legacy-address').hidden=!legacy;
-    const capture=()=>{this.draft={...Object.fromEntries(new FormData(form)),device_type:deviceType.value};};
+    this.editorValues=null;this.validateEditor=null;
+    const capture=()=>{this.draft={...Object.fromEntries(new FormData(form)),device_type:deviceType.value,...this.editorValues?.(),_command_drafts:Object.fromEntries([...form.querySelectorAll('[data-command]')].map(input=>[input.dataset.command,input.value]))};};
     form.oninput=capture;
     form.onchange=capture;
     form.onsubmit=async event=>{
       event.preventDefault(); if(this.saving)return;
       const button=form.querySelector('[type=submit]'); button.disabled=true; this.saving=true;
       try {
+        this.validateEditor?.();
         const data=Object.fromEntries(new FormData(form));
         const device={name:data.name,device_type:deviceType.value,topic:data.topic.trim(),protocol:data.protocol,transport:data.transport};
         if(device.device_type!=='climate') {
@@ -122,6 +130,7 @@ class ZigbeeIRPanel extends HTMLElement {
         else {
           device.model=Number(data.model); device.min_temp=Number(data.min_temp); device.max_temp=Number(data.max_temp); device.temp_step=Number(data.temp_step);
           device.hvac_options=JSON.parse(data.hvac_options.trim() || '{}');
+          Object.assign(device,this.editorValues?.() || {});
         }
         form.querySelector('fieldset').disabled=true;
         const saved=await this._hass.callWS(editing?{type:'tuya_ir_bridge/update',device_id:selected.id,device}:{type:'tuya_ir_bridge/create',device});
@@ -133,6 +142,7 @@ class ZigbeeIRPanel extends HTMLElement {
       } catch(error) { this.status(errorText(error)); form.querySelector('fieldset').disabled=false; button.disabled=false; }
       finally {this.saving=false;}
     };
+    mountEditor(this,form,selected,values,capture);
   }
 }
 if (!customElements.get('zigbee-ir-ready-panel')) customElements.define('zigbee-ir-ready-panel',ZigbeeIRPanel);

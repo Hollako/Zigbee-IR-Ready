@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+- Add a tabbed editor, climate capability selections and dynamic feature switches.
+- Add optional Zigbee2MQTT button learning, cancellation, command testing and
+  per-button editors for power, navigation, playback, channels, keypad and sources.
+- Adapt the Tasmota remote card into an IR Remotes sidebar and dashboard card;
+  create companion remotes for media players and expose configured media controls.
+
+- Send Zosung messages as JSON strings on the MQTT attribute topic so
+  Zigbee2MQTT passes text to the converter. Previously, its MQTT parser produced
+  an object that affected converters turned into an invalid IR code.
+- Preserve the generated timing code and carrier frequency. Legacy Base64 is
+  unchanged. Zosung still requires a converter supporting full JSON messages.
+
+Validation: 22 Python tests, 5 panel tests, browser checks for learning and
+remote controls, and isolated Home Assistant smoke tests. Hardware confirmation
+of the new learning/features and Zosung fix is pending. Legacy Base64 Electra
+operation has been confirmed by the user. Restart Home Assistant after updating.
+
 ## 0.2.1
 
 - Fix unreadable native dropdown options in dark mode and follow theme changes.
