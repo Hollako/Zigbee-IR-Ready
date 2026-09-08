@@ -10,8 +10,10 @@ function panel() {
   const fields = Object.fromEntries(['name','device_type','protocol','topic','transport','model','min_temp','max_temp','temp_step','address','command_map','hvac_options'].map(name=>[name,{value:''}]));
   fields.device_type.value='climate';
   get('form').elements = {namedItem: name => fields[name]};
+  get('form').querySelector=()=>({append:()=>{}});
   let Component;
   const context = vm.createContext({
+    document:{createElement:()=>({style:{}})},
     HTMLElement: class { attachShadow() { this.shadowRoot={querySelector:get,querySelectorAll:()=>[]}; } toggleAttribute() {} },
     customElements: {get:()=>undefined, define:(_,component)=>{Component=component;}},
   });

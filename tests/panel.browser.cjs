@@ -15,13 +15,14 @@ const root=path.resolve(__dirname,'..');
       return route.fulfill({contentType:'text/html',body:`<html><style>body{margin:0;--primary-text-color:#e1e1e1;--secondary-text-color:#aaa;--card-background-color:#1c1c1c;--primary-background-color:#111;--secondary-background-color:#282828;--primary-color:#03a9f4;--input-fill-color:#222;--input-ink-color:#555}</style><zigbee-ir-ready-panel></zigbee-ir-ready-panel><script type="module">
       import '/manager.js';
       window.devices=[{id:'ac',name:'Bedroom AC',device_type:'climate',protocol:'ELECTRA_AC',topic:'zigbee2mqtt/Bedroom/set/ir_code_to_send',transport:'zosung',model:-1,min_temp:16,max_temp:32,temp_step:1,hvac_options:{SwingV:'Auto'}},{id:'tv',name:'Legacy TV',device_type:'remote',protocol:'nec',address:18,topic:'zigbee2mqtt/TV/set/ir_code_to_send',commands:{power:32}}];
-      window.requests=[];
+      window.requests=[];window.failLearning=true;
       window.hass={themes:{darkMode:true},callWS:async message=>{
         window.requests.push(message);
         if(message.type.endsWith('/list'))return structuredClone(window.devices);
         if(message.type.endsWith('/catalogue'))return {climate:['DAIKIN','ELECTRA_AC','GREE'],send:[{name:'NEC'},{name:'SONY'}]};
         if(message.type.endsWith('/update')){const saved={...message.device,id:message.device_id};window.devices=window.devices.map(d=>d.id===saved.id?saved:d);return saved;}
-        if(message.action==='learn_start')return {session:'learn-one'};
+        if(message.type.endsWith('/delete')){window.devices=window.devices.filter(d=>d.id!==message.device_id);return {deleted:message.device_id};}
+        if(message.action==='learn_start'){if(window.failLearning){window.failLearning=false;throw {code:'invalid_action',message:'MQTT subscription failed'};}return {session:'learn-one'};}
         if(message.action==='learn_status')return {status:'learned',code:'B4gjlBEwApoG'};
         if(message.type.endsWith('/action'))return {};
         throw Error('Unexpected request');
@@ -69,7 +70,14 @@ const root=path.resolve(__dirname,'..');
     await page.getByRole('tab',{name:'Power & Volume',exact:true}).click();
     const power=page.locator('.command-row').filter({has:page.locator('[data-command="power"]')});
     await power.getByRole('button',{name:'Learn',exact:true}).click();
-    await page.getByRole('status').filter({hasText:'Command learned'}).waitFor();
+    const learning=page.getByRole('dialog',{name:'Learn IR command'});
+    await learning.getByRole('status').filter({hasText:'MQTT subscription failed'}).waitFor();
+    await page.waitForTimeout(700);
+    assert.equal(await learning.isVisible(),true);
+    await learning.getByRole('button',{name:'Retry',exact:true}).click();
+    await learning.getByRole('button',{name:'Done',exact:true}).waitFor();
+    assert.equal(await learning.isVisible(),true);
+    await learning.getByRole('button',{name:'Done',exact:true}).click();
     assert.match(await power.locator('textarea').inputValue(),/Learned/);
     await power.getByRole('button',{name:'Test',exact:true}).click();
     await page.getByRole('status').filter({hasText:'Command sent'}).waitFor();
@@ -79,6 +87,14 @@ const root=path.resolve(__dirname,'..');
     await page.screenshot({path:path.join(root,'.build/panel-commands.png'),fullPage:true});
     await page.evaluate(()=>{hass.themes.darkMode=false;document.body.style.setProperty('--primary-text-color','#212121');document.body.style.setProperty('--card-background-color','#fff');document.querySelector('zigbee-ir-ready-panel').hass=hass;});
     assert.equal(await page.locator('#protocol').evaluate(el=>getComputedStyle(el).colorScheme),'light');
+    await page.getByRole('button',{name:'Delete Device',exact:true}).click();
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    assert.equal(await page.evaluate(()=>devices.length),2);
+    await page.getByRole('button',{name:'Delete Device',exact:true}).click();
+    await page.getByRole('button',{name:'Delete permanently',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'Device deleted'}).waitFor();
+    assert.equal(await page.evaluate(()=>devices.length),1);
+    assert.equal(await page.getByRole('button',{name:'Edit Legacy TV'}).count(),0);
     await page.evaluate(async()=>{await import('/remote_panel.js');document.body.style.setProperty('--primary-text-color','#e1e1e1');document.body.style.setProperty('--card-background-color','#1c1c1c');const panel=document.createElement('zigbee-ir-remotes-panel');document.body.replaceChildren(panel);window.remoteCalls=[];panel.hass={themes:{darkMode:true},states:{'remote.tv':{state:'on',attributes:{friendly_name:'Living Room TV',zigbee_ir_device_id:'tv',configured_commands:['power','volume_up','volume_down','up','down','left','right','ok','digit_1']}}},callService:async(...args)=>remoteCalls.push(args)};});
     await page.locator('[data-cmd="power"]').first().click();
     assert.equal(await page.evaluate(()=>remoteCalls[0][2].command),'power');

@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, get_hassjob_callable_job_type, HassJobType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.components.climate import ClimateEntityFeature
 from custom_components.tuya_ir_bridge.hub import Hub, validate_device
@@ -24,6 +24,7 @@ async def main():
     config={'name':'AC','device_type':'climate','protocol':'ELECTRA_AC','topic':'Zigbee/Test/set/ir_code_to_send','transport':'base64','hvac_modes':['off','cool'],'fan_modes':['auto','high'],'swing_modes':['off','vertical'],'feature_switches':['Light','SwingV'],'hvac_options':{'Light':False}}
     device=await hub.create(config);ac=IRClimate(hub,device);ac.async_write_ha_state=Mock();hub.entities['climate.test']=ac
     toggle=IRFeatureSwitch(hub,device,'Light')
+    assert toggle.assumed_state is False
     assert ac.hvac_modes==['off','cool'] and ac.fan_modes==['auto','high']
     assert ac.supported_features & ClimateEntityFeature.SWING_MODE
     with patch.object(hub,'send',new_callable=AsyncMock):
@@ -49,6 +50,7 @@ async def main():
     callback=None;unsub=Mock()
     async def subscribe(hass,topic,handler,**kwargs):
         nonlocal callback
+        assert get_hassjob_callable_job_type(handler) is HassJobType.Callback
         callback=handler;return unsub
     with patch('custom_components.tuya_ir_bridge.learning.mqtt.async_subscribe',side_effect=subscribe),patch('custom_components.tuya_ir_bridge.learning.mqtt.async_publish',new_callable=AsyncMock) as publish:
         session=await hub.learning.start(config['topic']);await asyncio.sleep(0)

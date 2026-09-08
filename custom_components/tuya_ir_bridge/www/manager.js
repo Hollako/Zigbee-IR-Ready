@@ -32,6 +32,25 @@ class ZigbeeIRPanel extends HTMLElement {
   }
   status(message) { this.shadowRoot.querySelector('.statusbar').textContent=message; }
   disconnectedCallback() { this.cancelLearning?.(); }
+  async deleteDevice(device) {
+    if(this.saving || this.learning)return;
+    const dialog=document.createElement('dialog');
+    dialog.innerHTML=`<h2>Delete ${esc(device.name)}?</h2><p>This removes the saved configuration, learned commands, and all its Home Assistant entities, including feature switches and companion remotes.</p><p>The physical Zigbee IR blaster and other virtual devices will remain.</p><p role="alert"></p><button type="button" data-cancel>Cancel</button><button type="button" data-confirm>Delete permanently</button>`;
+    this.shadowRoot.append(dialog);dialog.showModal();
+    dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+    dialog.onclose=()=>dialog.remove();
+    dialog.oncancel=event=>{if(this.saving)event.preventDefault();};
+    dialog.querySelector('[data-confirm]').onclick=async()=>{
+      this.saving=true;dialog.querySelector('[data-confirm]').disabled=true;
+      dialog.querySelector('[data-cancel]').disabled=true;
+      try{
+        await this._hass.callWS({type:'tuya_ir_bridge/delete',device_id:device.id});
+        this.devices=this.devices.filter(d=>d.id!==device.id);this.selectedId=null;this.draft=null;this.activeTab='connection';
+        dialog.close();this.render();this.status('Device deleted, including its related Home Assistant entities.');
+      }catch(error){dialog.querySelector('[role=alert]').textContent=errorText(error);dialog.querySelector('[data-confirm]').disabled=false;dialog.querySelector('[data-cancel]').disabled=false;}
+      finally{this.saving=false;}
+    };
+  }
   render() {
     const selected=this.devices.find(device=>device.id===this.selectedId);
     const editing=!!selected;
@@ -143,6 +162,7 @@ class ZigbeeIRPanel extends HTMLElement {
       finally {this.saving=false;}
     };
     mountEditor(this,form,selected,values,capture);
+    if(editing){const remove=document.createElement('button');remove.type='button';remove.textContent='Delete Device';remove.style.color='var(--error-color,#db4437)';remove.onclick=()=>this.deleteDevice(selected);form.querySelector('.form-actions').append(remove);}
   }
 }
 if (!customElements.get('zigbee-ir-ready-panel')) customElements.define('zigbee-ir-ready-panel',ZigbeeIRPanel);

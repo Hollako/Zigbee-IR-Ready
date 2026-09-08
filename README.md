@@ -144,7 +144,7 @@ common-HVAC dispatch failure. Other entries need specific models/state lengths.
 Physical testing remains necessary.
 
 The panel adapts the Tasmota IR Ready editor and remote card. Automatic blaster
-discovery, device deletion, source-cycle tracking and online profile browsing
+discovery, source-cycle tracking and online profile browsing
 remain future work. It is not a complete replica of every Tasmota feature.
 
 ### Tabbed editor, learning and remotes (0.3.0)
@@ -187,6 +187,12 @@ and browser tests use mocked MQTT and HA services; physical validation of these
 new features is still needed. Restart Home Assistant after updating to 0.3.0.
 
 ### Editing an existing device
+
+**Deleting:** select the device, click **Delete Device**, then
+confirm **Delete permanently**. This removes its saved configuration and learned
+commands, primary entity, companion remote and feature switches, including
+disabled registry entries. The physical Zigbee2MQTT blaster and other virtual
+devices remain. Automations referencing removed entities must be updated.
 
 Click a device in the panel's left sidebar to open **Edit Device**. Change its
 name, MQTT topic, transport, protocol, model, temperature limits, HVAC options or

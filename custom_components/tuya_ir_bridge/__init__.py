@@ -35,14 +35,14 @@ async def async_setup_entry(hass, entry):
         hass, webcomponent_name="zigbee-ir-ready-panel",
         sidebar_title="Zigbee IR Ready", sidebar_icon="mdi:remote",
         frontend_url_path="zigbee-ir-ready",
-        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.0",
+        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.1",
         embed_iframe=False, require_admin=True,
     )
     await panel_custom.async_register_panel(
         hass, webcomponent_name="zigbee-ir-remotes-panel",
         sidebar_title="IR Remotes", sidebar_icon="mdi:remote-tv",
         frontend_url_path="zigbee-ir-remotes",
-        module_url=f"/{DOMAIN}_static/remote_panel.js?v=0.3.0",
+        module_url=f"/{DOMAIN}_static/remote_panel.js?v=0.3.1",
         embed_iframe=False, require_admin=False,
     )
     return True

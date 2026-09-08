@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.1
+
+- Keep the learning dialog open on failure and success, with a visible error,
+  Retry, countdown and explicit Done/Close controls. Log backend learning errors.
+- Register the learning MQTT handler as an event-loop callback so it can safely
+  complete its asyncio future instead of running in an executor thread.
+
+- Display climate feature switches as normal toggles using their last sent
+  state, instead of separate On/Off buttons. IR state remains optimistic.
+
+- Add Delete Device with confirmation. Remove saved commands and settings,
+  loaded entities, disabled registry entries, feature switches and companion
+  remotes. Preserve the physical blaster and unrelated virtual devices.
+- Wait for active entity commands and reject queued sends after deletion.
+- Validate deletion cancellation, storage failure and registry cleanup in tests.
+
 ## 0.3.0
 
 - Add a tabbed editor, climate capability selections and dynamic feature switches.

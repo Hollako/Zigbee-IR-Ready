@@ -91,19 +91,38 @@ export function mountEditor(panel,form,selected,values,capture) {
   }
   async function learn(input){
     if(panel.learning)return;panel.learning=true;
-    const overlay=document.createElement('div');overlay.className='learning-overlay';overlay.innerHTML='<div><h2>Learn IR command</h2><p role="status">Point the original remote at the blaster and press the button. Waiting up to 30 seconds…</p><button type="button">Cancel</button></div>';root.append(overlay);
-    let token,cancelled=false;
-    const cancel=async()=>{cancelled=true;if(token)await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_cancel',data:{session:token}}).catch(()=>{});};
-    panel.cancelLearning=cancel;
-    overlay.querySelector('button').onclick=()=>{cancel();overlay.remove();};
-    try{const started=await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_start',data:{topic:field('topic').value.trim()}});token=started.session;
-      if(cancelled){await cancel();return;}
-      for(let attempt=0;attempt<65&&!cancelled;attempt++){
-        await new Promise(resolve=>setTimeout(resolve,500));
-        const result=await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_status',data:{session:token}});
-        if(result.status==='learned'){input.value=JSON.stringify({Learned:result.code});input.dispatchEvent(new Event('learned'));syncCommands();panel.status('Command learned. Test it, then save the device.');return;}
-        if(result.status!=='waiting')throw Error(result.error||`Learning ${result.status}. Try again.`);
-      }
-    }catch(error){panel.status(error.message||String(error));}finally{await cancel();overlay.remove();panel.learning=false;panel.cancelLearning=null;}
+    const overlay=document.createElement('div');overlay.className='learning-overlay';
+    overlay.innerHTML='<div role="dialog" aria-modal="true" aria-label="Learn IR command"><h2>Learn IR command</h2><p role="status"></p><button type="button" data-retry hidden>Retry</button><button type="button" data-close>Cancel</button></div>';
+    root.append(overlay);
+    const message=overlay.querySelector('[role=status]'),retry=overlay.querySelector('[data-retry]'),close=overlay.querySelector('[data-close]');
+    let token,closed=false,running=false;
+    const stop=async()=>{const current=token;token=null;if(current)await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_cancel',data:{session:current}}).catch(()=>{});};
+    const dismiss=async()=>{closed=true;overlay.remove();await stop();panel.learning=false;if(panel.cancelLearning===dismiss)panel.cancelLearning=null;};
+    panel.cancelLearning=dismiss;close.onclick=dismiss;
+    async function attempt(){
+      if(running||closed)return;running=true;retry.hidden=true;close.textContent='Cancel';
+      message.textContent='Starting learning…';
+      try{
+        const started=await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_start',data:{topic:field('topic').value.trim()}});token=started.session;
+        if(closed){await stop();return;}
+        for(let count=0;count<65&&!closed;count++){
+          message.textContent=`Point the original remote at the blaster and press the button. Waiting… ${Math.max(0,30-Math.floor(count/2))} seconds remaining.`;
+          await new Promise(resolve=>setTimeout(resolve,500));
+          if(closed)break;
+          const result=await panel._hass.callWS({type:'tuya_ir_bridge/action',action:'learn_status',data:{session:token}});
+          if(closed)break;
+          if(result.status==='learned'){
+            input.value=JSON.stringify({Learned:result.code});input.dispatchEvent(new Event('learned'));syncCommands();
+            message.textContent='Command learned. Close this window to test it, then save the device.';close.textContent='Done';
+            panel.status('Command learned. Test it, then save the device.');return;
+          }
+          if(result.status!=='waiting')throw Error(result.error||`Learning ${result.status}. Try again.`);
+        }
+        if(!closed)throw Error('No IR command received. Check the blaster topic and try again.');
+      }catch(error){
+        if(!closed){const detail=error?.error||error;const text=detail?.message||String(detail);message.textContent=`Learning failed: ${text}`;panel.status(`Learning failed: ${text}`);retry.hidden=false;close.textContent='Close';}
+      }finally{await stop();running=false;}
+    }
+    retry.onclick=attempt;await attempt();
   }
 }

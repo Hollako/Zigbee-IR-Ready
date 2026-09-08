@@ -28,7 +28,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class IRFeatureSwitch(SwitchEntity):
     _attr_should_poll = False
     _attr_has_entity_name = True
-    _attr_assumed_state = True
+    # Display a normal toggle using the last successfully sent climate state.
+    # IR remains one-way; this is not confirmation from the appliance.
+    _attr_assumed_state = False
 
     def __init__(self, hub, device, feature):
         self.hub, self.device_id, self.feature = hub, device["id"], feature

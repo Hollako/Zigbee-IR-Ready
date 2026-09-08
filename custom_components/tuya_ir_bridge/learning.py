@@ -1,9 +1,13 @@
 """Short-lived, cancellable Zigbee2MQTT learning sessions."""
 import asyncio
 import json
+import logging
 from uuid import uuid4
 from homeassistant.components import mqtt
+from homeassistant.core import callback
 from .codec import tuya_to_raw
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class LearningManager:
@@ -33,6 +37,7 @@ class LearningManager:
         self.sessions[token] = session
         future = asyncio.get_running_loop().create_future()
 
+        @callback
         def received(message):
             if message.retain or future.done():
                 return
@@ -58,6 +63,7 @@ class LearningManager:
                 session["status"] = "cancelled"
                 raise
             except Exception as err:
+                _LOGGER.exception("IR learning failed for %s", base)
                 session.update(status="error", error=str(err))
             finally:
                 if unsubscribe:

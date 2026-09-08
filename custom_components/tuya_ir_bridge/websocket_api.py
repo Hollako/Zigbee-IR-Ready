@@ -40,6 +40,24 @@ def register_commands(hass):
     websocket_api.async_register_command(hass, catalogue)
     websocket_api.async_register_command(hass, update_device)
     websocket_api.async_register_command(hass, panel_action)
+    websocket_api.async_register_command(hass, delete_device)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/delete", vol.Required("device_id"): str})
+@websocket_api.async_response
+async def delete_device(hass, connection, msg):
+    if connection.user is None or not connection.user.is_admin:
+        raise Unauthorized
+    hub = hass.data.get(DOMAIN)
+    if hub is None:
+        connection.send_error(msg["id"], "not_loaded", "Integration is not loaded")
+        return
+    try:
+        result = await hub.delete(msg["device_id"])
+    except (ValueError, OSError) as err:
+        connection.send_error(msg["id"], "delete_failed", str(err))
+        return
+    connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/update", vol.Required("device_id"): str, vol.Required("device"): dict})

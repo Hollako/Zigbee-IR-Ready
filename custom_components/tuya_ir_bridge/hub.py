@@ -1,10 +1,12 @@
 """Persistent virtual devices and local upstream protocol engine."""
 import asyncio
 import copy
+from contextlib import AsyncExitStack
 from uuid import uuid4
 from homeassistant.components import mqtt
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN, DEVICE_TYPES, HVAC_MODES, FAN_MODES, SWING_MODES, FEATURES
 from .native import NativeEngine
 from .protocols import encode_command
@@ -82,6 +84,7 @@ class Hub:
         self.devices, self.adders, self.entities = [], {}, {}
         self.lock, self.tx_locks = asyncio.Lock(), {}
         self.feature_entities, self.listeners = {}, set()
+        self.deleted = set()
         from .learning import LearningManager
         self.learning = LearningManager(self)
         self.engine = NativeEngine()
@@ -157,6 +160,37 @@ class Hub:
         for listener in tuple(self.listeners):
             listener()
 
+    async def delete(self, device_id):
+        """Remove only this virtual device, never its physical MQTT blaster."""
+        async with self.lock:
+            entities = [e for e in self.entities.values() if e.device["id"] == device_id]
+            switches = [e for (key, _), e in self.feature_entities.items() if key == device_id]
+            async with AsyncExitStack() as locks:
+                for entity in entities:
+                    await locks.enter_async_context(entity._command_lock)
+                updated = [d for d in self.devices if d["id"] != device_id]
+                await self.store.async_save(updated)
+                self.devices = updated
+                self.deleted.add(device_id)
+                registry = er.async_get(self.hass)
+                devices = dr.async_get(self.hass)
+                registered = devices.async_get_device(identifiers={(DOMAIN, device_id)})
+                for entity in [*entities, *switches]:
+                    if entity.hass is not None and entity.entity_id:
+                        await entity.async_remove()
+                self.entities = {key: e for key, e in self.entities.items() if e.device["id"] != device_id}
+                self.feature_entities = {key: e for key, e in self.feature_entities.items() if key[0] != device_id}
+                # Include disabled and unavailable registry entries, not just
+                # objects currently loaded in the entity platforms.
+                prefix = device_id + "_"
+                for entry in list(registry.entities.values()):
+                    if entry.platform == DOMAIN and entry.config_entry_id == self.entry.entry_id and (entry.unique_id == device_id or entry.unique_id.startswith(prefix)):
+                        registry.async_remove(entry.entity_id)
+                if registered and not er.async_entries_for_device(registry, registered.id) and registered.config_entries <= {self.entry.entry_id}:
+                    devices.async_remove_device(registered.id)
+                self.notify()
+        return {"deleted": device_id}
+
     def primary_entity(self, device_id):
         return next((e for e in self.entities.values() if e.unique_id == device_id), None)
 
@@ -219,9 +253,13 @@ class Hub:
         return result
 
     async def send(self, device, signal):
+        if device.get("id") in self.deleted:
+            raise ValueError("This virtual device has been deleted")
         payload, duration = prepare_signal(signal, device.get("transport", "base64"))
         topic = device["topic"]
         async with self.tx_locks.setdefault(topic, asyncio.Lock()):
+            if device.get("id") in self.deleted:
+                raise ValueError("This virtual device has been deleted")
             if any(s["topic"] == topic and s["status"] == "waiting" for s in self.learning.sessions.values()):
                 raise ValueError("The blaster is learning. Finish or cancel learning before sending")
             await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
