@@ -136,8 +136,21 @@ common-HVAC dispatch failure. Other entries need specific models/state lengths.
 Physical testing remains necessary.
 
 The panel reuses Tasmota IR Ready toolbar/sidebar styling with a vanilla Web
-Component. Automatic blaster discovery, editing/deletion and richer media controls
+Component. Automatic blaster discovery, deletion and richer media controls
 remain future work. This is not yet a full replica of the Tasmota editor.
+
+### Editing an existing device
+
+Click a device in the panel's left sidebar to open **Edit Device**. Change its
+name, MQTT topic, transport, protocol, model, temperature limits, HVAC options or
+command map, then click **Save Changes**. Changes apply immediately to the existing
+entity and persist across restarts; its entity ID stays the same. Saving does not
+transmit IR. **Cancel Changes** reloads saved settings. Device type is fixed;
+use **New Device** for a different type. Existing Home Assistant name overrides
+remain in effect.
+
+After updating through HACS, restart Home Assistant and reload the panel to load
+the new frontend. Native dropdowns follow Home Assistant's light/dark theme.
 
 ## Architecture and rebuilding
 

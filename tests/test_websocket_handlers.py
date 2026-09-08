@@ -41,7 +41,7 @@ class WebsocketTests(unittest.IsolatedAsyncioTestCase):
     async def test_non_admin_rejected_before_access(self):
         api = handlers()
         for user in (None, SimpleNamespace(is_admin=False)):
-            for name in ('list_devices', 'create_device', 'catalogue'):
+            for name in ('list_devices', 'create_device', 'catalogue', 'update_device'):
                 with self.assertRaises(Unauthorized):
                     await api[name](SimpleNamespace(data={}), SimpleNamespace(user=user), {'id': 1})
 

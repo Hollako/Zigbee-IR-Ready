@@ -1,5 +1,4 @@
 """Climate using upstream IRac with per-device previous state."""
-import asyncio
 from homeassistant.components.climate import ClimateEntity, ClimateEntityFeature, HVACMode
 from homeassistant.const import UnitOfTemperature, ATTR_TEMPERATURE
 from homeassistant.exceptions import HomeAssistantError
@@ -25,7 +24,6 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
 
     def __init__(self, hub, device):
         super().__init__(hub, device)
-        self._command_lock = asyncio.Lock()
         self._previous = None
         self._attr_min_temp = device.get("min_temp", 16)
         self._attr_max_temp = device.get("max_temp", 32 if device["protocol"].lower() in ("electra", "electra_ac") else 30)
@@ -45,6 +43,16 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
     @property
     def extra_state_attributes(self):
         return {"ir_previous_state": self._previous}
+
+    def apply_device(self, device):
+        # A changed encoder/blaster/options invalidates the previous IR estimate.
+        if any(self.device.get(key) != device.get(key) for key in ("protocol", "model", "topic", "hvac_options")):
+            self._previous = None
+        self._attr_min_temp = device.get("min_temp", 16)
+        self._attr_max_temp = device.get("max_temp", 32 if device["protocol"].lower() in ("electra", "electra_ac") else 30)
+        self._attr_target_temperature_step = device.get("temp_step", 1)
+        self._attr_target_temperature = max(self._attr_min_temp, min(self._attr_target_temperature, self._attr_max_temp))
+        super().apply_device(device)
 
     async def _set(self, mode=None, temperature=None, fan=None, extra=None):
         async with self._command_lock:

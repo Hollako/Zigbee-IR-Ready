@@ -4,6 +4,7 @@ import copy
 from uuid import uuid4
 from homeassistant.components import mqtt
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers import device_registry as dr
 from .const import DOMAIN, PLATFORMS
 from .native import NativeEngine
 from .protocols import encode_command
@@ -89,18 +90,45 @@ class Hub:
 
     async def create(self, data):
         device = validate_device(data, self.catalogue)
-        # Encode before saving; never transmit during creation.
-        if device["device_type"] == "climate":
-            await self.hvac(device, {"Power": False, "Mode": "Auto", "Temp": max(device.get("min_temp",16), min(24,device.get("max_temp",30))), "FanSpeed": "Auto"})
-        else:
-            for name in device["commands"]:
-                await self.command(device, name)
+        await self.validate_encoding(device)
         async with self.lock:
             device["id"] = uuid4().hex
             updated = [*self.devices, device]
             await self.store.async_save(updated)
             self.devices = updated
             self.adders[device["device_type"]](device)
+        return device
+
+    async def validate_encoding(self, device):
+        # Encode before saving; never transmit during creation.
+        if device["device_type"] == "climate":
+            await self.hvac(device, {"Power": False, "Mode": "Auto", "Temp": max(device.get("min_temp",16), min(24,device.get("max_temp",30))), "FanSpeed": "Auto"})
+        else:
+            for name in device["commands"]:
+                await self.command(device, name)
+
+    async def update(self, device_id, data):
+        device = validate_device(data, self.catalogue)
+        async with self.lock:
+            old = next((d for d in self.devices if d["id"] == device_id), None)
+            if old is None:
+                raise ValueError("Device no longer exists. Refresh the device list")
+            if device["device_type"] != old["device_type"]:
+                raise ValueError("Device type cannot be changed; create a separate device for a different type")
+            await self.validate_encoding(device)
+            device["id"] = device_id
+            entity = next((e for e in self.entities.values() if e.device["id"] == device_id), None)
+            # Wait for an in-flight command before replacing its parameters.
+            async with entity._command_lock if entity else asyncio.Lock():
+                updated = [device if d["id"] == device_id else d for d in self.devices]
+                await self.store.async_save(updated)
+                self.devices = updated
+                registry = dr.async_get(self.hass)
+                registered = registry.async_get_device(identifiers={(DOMAIN, device_id)})
+                if registered:
+                    registry.async_update_device(registered.id, name=device["name"], model=device["protocol"])
+                if entity:
+                    entity.apply_device(device)
         return device
 
     async def hvac(self, device, state, previous=None):

@@ -7,11 +7,12 @@ const path = require('node:path');
 function panel() {
   const nodes = new Map();
   const get = key => { if (!nodes.has(key)) nodes.set(key, {}); return nodes.get(key); };
-  const fields = {device_type: {value:'climate'}, protocol:{}};
+  const fields = Object.fromEntries(['name','device_type','protocol','topic','transport','model','min_temp','max_temp','temp_step','address','command_map','hvac_options'].map(name=>[name,{value:''}]));
+  fields.device_type.value='climate';
   get('form').elements = {namedItem: name => fields[name]};
   let Component;
   const context = vm.createContext({
-    HTMLElement: class { attachShadow() { this.shadowRoot={querySelector:get}; } },
+    HTMLElement: class { attachShadow() { this.shadowRoot={querySelector:get,querySelectorAll:()=>[]}; } toggleAttribute() {} },
     customElements: {get:()=>undefined, define:(_,component)=>{Component=component;}},
   });
   const source=readFileSync(path.join(__dirname,'../custom_components/tuya_ir_bridge/www/manager.js'),'utf8')
@@ -50,4 +51,28 @@ test('successful list request refreshes device data',async()=>{
   instance._hass={callWS:async({type})=>type.endsWith('/list')?devices:instance.catalogue};
   assert.equal(await instance.refresh(),true);
   assert.equal(instance.devices,devices);
+});
+
+test('selecting an existing device loads editable parameters and keeps type fixed',()=>{
+  const {instance,fields}=panel();
+  instance.devices=[{id:'one',name:'Bedroom',device_type:'climate',protocol:'electra',topic:'zigbee2mqtt/Bedroom/set/ir_code_to_send',hvac_options:{SwingV:'Auto'}}];
+  instance.selectDevice('one');
+  assert.equal(fields.name.value,'Bedroom');
+  assert.equal(fields.protocol.value,'ELECTRA_AC');
+  assert.equal(fields.transport.value,'base64');
+  assert.equal(fields.max_temp.value,32);
+  assert.equal(fields.device_type.disabled,true);
+  assert.match(fields.hvac_options.value,/SwingV/);
+  assert.match(instance.shadowRoot.innerHTML,/Save Changes/);
+});
+
+test('refresh preserves an unsaved draft',async()=>{
+  const {instance,fields}=panel();
+  instance.devices=[{id:'one',name:'Old',device_type:'climate',protocol:'GREE'}];
+  instance.selectedId='one';
+  instance.draft={name:'Unsaved',device_type:'climate',protocol:'GREE',command_map:'invalid JSON draft'};
+  instance._hass={callWS:async({type})=>type.endsWith('/list')?instance.devices:instance.catalogue};
+  await instance.refresh();
+  assert.equal(fields.name.value,'Unsaved');
+  assert.equal(fields.command_map.value,'invalid JSON draft');
 });

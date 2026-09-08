@@ -1,4 +1,5 @@
 """Registry-backed virtual entity base. State is optimistic."""
+import asyncio
 from homeassistant.helpers.entity import Entity, DeviceInfo
 from .const import DOMAIN
 
@@ -11,11 +12,21 @@ class IREntity(Entity):
 
     def __init__(self, hub, device):
         self.hub, self.device = hub, device
+        self._command_lock = asyncio.Lock()
         self._attr_unique_id = device["id"]
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device["id"])}, name=device["name"],
             manufacturer="Zigbee IR Ready", model=device["protocol"],
         )
+
+    def apply_device(self, device):
+        """Apply validated settings without replacing the registered entity."""
+        self.device = device
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device["id"])}, name=device["name"],
+            manufacturer="Zigbee IR Ready", model=device["protocol"],
+        )
+        self.async_write_ha_state()
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
@@ -27,11 +38,12 @@ class IREntity(Entity):
 
     async def send_command(self, name):
         from homeassistant.exceptions import HomeAssistantError
-        try:
-            signal = await self.hub.command(self.device, name)
-        except (KeyError, ValueError) as err:
-            raise HomeAssistantError(f"Cannot encode {name}: {err}") from err
-        await self.hub.send(self.device, signal)
+        async with self._command_lock:
+            try:
+                signal = await self.hub.command(self.device, name)
+            except (KeyError, ValueError) as err:
+                raise HomeAssistantError(f"Cannot encode {name}: {err}") from err
+            await self.hub.send(self.device, signal)
 
 
 def setup_platform(hass, entry, async_add_entities, kind, factory):

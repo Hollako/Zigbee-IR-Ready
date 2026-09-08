@@ -18,8 +18,9 @@ def register_services(hass):
                     raise HomeAssistantError("IRhvac requires a climate entity")
                 await entity.async_irhvac(call.data["command"])
             else:
-                signal = await hub.irsend(entity.device, call.data["command"])
-                await hub.send(entity.device, signal)
+                async with entity._command_lock:
+                    signal = await hub.irsend(entity.device, call.data["command"])
+                    await hub.send(entity.device, signal)
         except (ValueError, TypeError, KeyError) as err:
             raise HomeAssistantError(str(err)) from err
 

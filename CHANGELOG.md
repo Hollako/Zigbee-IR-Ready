@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1
+
+- Fix unreadable native dropdown options in dark mode and follow theme changes.
+- Add editing from the sidebar, Save Changes and Cancel Changes. Update protocol,
+  blaster, command maps and climate parameters without replacing entity IDs.
+- Validate edits before saving, preserve legacy transport/address settings, and
+  apply updates after any active command completes. Saving sends no IR.
+- Bump the panel cache URL so the updated interface loads after restarting HA.
+
+Validation: 20 Python tests, 5 panel tests, a real Edge browser regression for
+dark/light themes and editing, and isolated Home Assistant smoke tests.
+
 ## 0.2.0
 
 - Replace the three-protocol backend with bundled, static IRremoteESP8266 engines
