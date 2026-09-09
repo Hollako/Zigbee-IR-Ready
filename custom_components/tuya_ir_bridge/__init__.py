@@ -1,4 +1,5 @@
 """Zigbee IR Ready integration setup."""
+import json
 from pathlib import Path
 from homeassistant.components import panel_custom, frontend
 from homeassistant.components.http import StaticPathConfig
@@ -10,6 +11,8 @@ from .websocket_api import register_commands
 from .services import register_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+_VERSION = json.loads((Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))["version"]
+_CARD_URL = f"/{DOMAIN}_static/remote_card.js?v={_VERSION}"
 
 
 async def async_setup(hass, config):
@@ -31,19 +34,13 @@ async def async_setup_entry(hass, entry):
             StaticPathConfig(f"/{DOMAIN}_static", str(Path(__file__).parent / "www"), False)
         ])
         hass.data[f"{DOMAIN}_static"] = True
+    frontend.add_extra_js_url(hass, _CARD_URL)
     await panel_custom.async_register_panel(
         hass, webcomponent_name="zigbee-ir-ready-panel",
         sidebar_title="Zigbee IR Ready", sidebar_icon="mdi:remote",
         frontend_url_path="zigbee-ir-ready",
-        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.1",
+        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.2",
         embed_iframe=False, require_admin=True,
-    )
-    await panel_custom.async_register_panel(
-        hass, webcomponent_name="zigbee-ir-remotes-panel",
-        sidebar_title="IR Remotes", sidebar_icon="mdi:remote-tv",
-        frontend_url_path="zigbee-ir-remotes",
-        module_url=f"/{DOMAIN}_static/remote_panel.js?v=0.3.1",
-        embed_iframe=False, require_admin=False,
     )
     return True
 
@@ -53,6 +50,6 @@ async def async_unload_entry(hass, entry):
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     frontend.async_remove_panel(hass, "zigbee-ir-ready")
-    frontend.async_remove_panel(hass, "zigbee-ir-remotes")
+    frontend.remove_extra_js_url(hass, _CARD_URL)
     hass.data.pop(DOMAIN, None)
     return True

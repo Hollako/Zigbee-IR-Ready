@@ -1457,8 +1457,7 @@ if (!window.customCards.some(c => c.type === "zigbee-ir-ready-remote-card")) {
 }
 
 console.info(
-  `%c TASMOTA-IR-REMOTE-CARD %c v${CARD_VERSION} `,
+  `%c ZIGBEE-IR-READY-REMOTE-CARD %c v${CARD_VERSION} `,
   "background:#03a9f4;color:#fff;padding:2px 5px;border-radius:3px 0 0 3px;font-weight:700",
   "background:#e0e0e0;color:#333;padding:2px 5px;border-radius:0 3px 3px 0"
 );
-

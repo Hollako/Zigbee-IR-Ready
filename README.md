@@ -169,20 +169,20 @@ remain future work. It is not a complete replica of every Tasmota feature.
   persists it. Cancel stops waiting; the blaster's own learning window may stay
   open until it times out. Learned commands use the Zosung 38 kHz assumption.
   This is optional button learning, not a replacement for generated HVAC state.
-- **IR Remotes sidebar:** use the adapted Tasmota remote card with navigation,
-  volume, keypad, source and custom buttons. Media players also receive a
+- **Lovelace remote card:** add **Zigbee IR Ready Remote** from the dashboard's
+  Add Card picker. It provides navigation, volume, keypad, source and custom
+  buttons. Media players also receive a
   companion `remote` entity. Only configured commands appear. Media-player
   capabilities are enabled from configured commands; power-on/off are required.
 
-The remote card can also be used in a dashboard by adding
-`/tuya_ir_bridge_static/remote_card.js` as a JavaScript module resource and using:
+The integration registers the card resource automatically. Its YAML form is:
 
 ```yaml
 type: custom:zigbee-ir-ready-remote-card
 entity: remote.living_room_tv
 ```
 
-The sidebar loads its resources automatically. Backend learning/switch tests
+The integration loads its card resource automatically. Backend learning/switch tests
 and browser tests use mocked MQTT and HA services; physical validation of these
 new features is still needed. Restart Home Assistant after updating to 0.3.0.
 

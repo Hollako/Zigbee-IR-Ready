@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2
+
+- Compact command editing into one responsive row containing Format, Bits, Hex,
+  Advanced, Learn, Test and Clear controls.
+
+- Remove the separate IR Remotes sidebar. Register the remote card globally so
+  **Zigbee IR Ready Remote** appears in Lovelace's Add Card picker without adding
+  a dashboard resource manually.
+
 ## 0.3.1
 
 - Keep the learning dialog open on failure and success, with a visible error,
