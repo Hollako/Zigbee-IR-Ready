@@ -18,6 +18,7 @@ function panel() {
     customElements: {get:()=>undefined, define:(_,component)=>{Component=component;}},
   });
   const source=readFileSync(path.join(__dirname,'../custom_components/tuya_ir_bridge/www/manager.js'),'utf8')
+    .replace("import './remote_card.js';", '')
     .replace("import {CSS} from './panel.js';", "const CSS='';")
     .replace("import {mountEditor} from './editor.js';", "const mountEditor=()=>{};");
   vm.runInContext(source, context);

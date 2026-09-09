@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- Match the Tasmota-style AC editor with Connection, Capabilities and Behavior
+  tabs, pill selectors and toggle controls.
+- Add linked temperature, humidity, power and availability entities; initial
+  mode and target; precision; Celsius/Fahrenheit; away temperature; MQTT delay;
+  default swing values; keep-mode-on-power-on and ignore-off-temperature.
+- Simplify remote commands to one code field with Learn and Test. Decode learned
+  signals into protocol, bit count and hexadecimal data automatically, while
+  retaining undecodable raw signals.
+- Register the Lovelace remote card through both the global frontend module and
+  the manager fallback, and refresh the card picker after registration.
+
 ## 0.3.2
 
 - Compact command editing into one responsive row containing Format, Bits, Hex,

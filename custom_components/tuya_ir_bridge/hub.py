@@ -17,7 +17,7 @@ from .commands import normalize_hvac, normalize_keys
 def validate_device(data, catalogue):
     if not isinstance(data, dict):
         raise ValueError("Device must be an object")
-    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes"}
+    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes", "initial_hvac_mode", "initial_target_temp", "precision", "temperature_unit", "away_temp", "mqtt_delay", "temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor", "keep_mode_on_power_on", "ignore_off_temperature"}
     if set(data) - allowed:
         raise ValueError("Unknown device fields")
     data = copy.deepcopy(data)
@@ -57,12 +57,45 @@ def validate_device(data, catalogue):
         allowed_options = {"SwingV", "SwingH", "Quiet", "Turbo", "Econo", "Light", "Filter", "Clean", "Beep", "iFeel", "Sleep", "Clock", "SensorTemp"}
         if not isinstance(options, dict) or set(options) - allowed_options:
             raise ValueError("Invalid HVAC options")
+        unit = data.get("temperature_unit", "C")
+        if unit not in ("C", "F"):
+            raise ValueError("Temperature unit must be C or F")
+        data["temperature_unit"] = unit
+        limit = 122 if unit == "F" else 50
         for key in ("min_temp", "max_temp", "temp_step"):
             value = data.get(key, {"min_temp":16,"max_temp":30,"temp_step":1}[key])
-            if type(value) not in (int, float) or not 0 < value <= 50:
+            if type(value) not in (int, float) or not 0 < value <= limit:
                 raise ValueError(f"Invalid {key}")
         if data.get("min_temp",16) >= data.get("max_temp",30):
             raise ValueError("Minimum temperature must be below maximum")
+        initial_mode = data.get("initial_hvac_mode", "off")
+        if initial_mode not in data["hvac_modes"]:
+            raise ValueError("Initial operation mode must be enabled")
+        data["initial_hvac_mode"] = initial_mode
+        initial_temp = data.get("initial_target_temp", 24 if unit == "C" else 75)
+        if type(initial_temp) not in (int, float) or not data.get("min_temp",16) <= initial_temp <= data.get("max_temp",30):
+            raise ValueError("Initial target temperature is outside the configured range")
+        data["initial_target_temp"] = initial_temp
+        if data.get("precision", 0.1) not in (0.1, 0.5, 1):
+            raise ValueError("Precision must be 0.1, 0.5 or 1")
+        data.setdefault("precision", 0.1)
+        away = data.get("away_temp", 0)
+        if type(away) not in (int, float) or (away != 0 and not data.get("min_temp",16) <= away <= data.get("max_temp",30)):
+            raise ValueError("Away temperature must be 0 or within the configured range")
+        data["away_temp"] = away
+        delay = data.get("mqtt_delay", 0)
+        if type(delay) not in (int, float) or not 0 <= delay <= 60:
+            raise ValueError("MQTT delay must be between 0 and 60 seconds")
+        data["mqtt_delay"] = delay
+        for key in ("temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor"):
+            value = data.get(key, "")
+            if not isinstance(value, str) or len(value) > 255 or (value and "." not in value):
+                raise ValueError(f"Invalid {key}")
+            data[key] = value
+        for key in ("keep_mode_on_power_on", "ignore_off_temperature"):
+            if type(data.get(key, False)) is not bool:
+                raise ValueError(f"Invalid {key}")
+            data.setdefault(key, False)
     else:
         if protocol not in {p["name"] for p in catalogue["send"]}:
             raise ValueError("Protocol is not supported by the bundled IRsend engine")
@@ -198,7 +231,7 @@ class Hub:
         protocol = device["protocol"].upper()
         state = {**device.get("hvac_options", {}), **state,
                  "Protocol": "ELECTRA_AC" if protocol == "ELECTRA" else protocol,
-                 "Model": device.get("model", -1)}
+                 "Model": device.get("model", -1), "Celsius": device.get("temperature_unit", "C") == "C"}
         result = await self.engine.request({"op": "hvac", "state": state, "previous": previous})
         prepare_signal(result, device.get("transport", "base64"))
         return result, state
@@ -263,4 +296,4 @@ class Hub:
             if any(s["topic"] == topic and s["status"] == "waiting" for s in self.learning.sessions.values()):
                 raise ValueError("The blaster is learning. Finish or cancel learning before sending")
             await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
-            await asyncio.sleep(max(0.5, duration + 0.1))
+            await asyncio.sleep(max(0.5, duration + 0.1, device.get("mqtt_delay", 0)))

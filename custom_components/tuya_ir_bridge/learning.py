@@ -56,6 +56,21 @@ class LearningManager:
                 unsubscribe = await mqtt.async_subscribe(self.hub.hass, base, received, qos=0)
                 await mqtt.async_publish(self.hub.hass, base + "/set", json.dumps({"learn_ir_code": "ON"}), qos=0, retain=False)
                 session["code"] = await asyncio.wait_for(future, 30)
+                raw = tuya_to_raw(session["code"])
+                try:
+                    decoded = await self.hub.engine.request({"op": "decode", "timings": raw})
+                except Exception:
+                    _LOGGER.warning("Could not decode learned IR protocol; retaining raw signal", exc_info=True)
+                    decoded = {"recognized": False}
+                if decoded.get("recognized"):
+                    session["command"] = {
+                        "Protocol": decoded["protocol"],
+                        "Bits": decoded["bits"],
+                        "Data": decoded["data"],
+                    }
+                else:
+                    # Unknown and unusually shaped signals still remain usable.
+                    session["command"] = {"Learned": session["code"]}
                 session["status"] = "learned"
             except TimeoutError:
                 session["status"] = "timeout"

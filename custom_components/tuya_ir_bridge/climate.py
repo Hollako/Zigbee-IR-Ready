@@ -1,7 +1,10 @@
 """Climate using upstream IRac with per-device previous state."""
 from homeassistant.components.climate import ClimateEntity, ClimateEntityFeature, HVACMode
-from homeassistant.const import UnitOfTemperature, ATTR_TEMPERATURE
+from homeassistant.const import UnitOfTemperature, ATTR_TEMPERATURE, ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.util.unit_conversion import TemperatureConverter
 from .entity import IREntity, setup_platform
 from homeassistant.helpers.restore_state import RestoreEntity
 from .commands import normalize_hvac
@@ -30,13 +33,22 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
     def __init__(self, hub, device):
         super().__init__(hub, device)
         self._previous = None
+        self._remove_linked = None
+        self._attr_current_temperature = None
+        self._attr_current_humidity = None
+        self._attr_preset_mode = None
+        self._pre_away_temperature = None
+        self._last_active_mode = next((mode for mode in device.get("hvac_modes", HVAC_MODES) if mode != "off"), "auto")
         self._attr_min_temp = device.get("min_temp", 16)
         self._attr_max_temp = device.get("max_temp", 32 if device["protocol"].lower() in ("electra", "electra_ac") else 30)
         self._attr_target_temperature_step = device.get("temp_step", 1)
-        self._attr_target_temperature = max(self._attr_min_temp, min(24, self._attr_max_temp))
+        self._attr_target_temperature = device.get("initial_target_temp", max(self._attr_min_temp, min(24, self._attr_max_temp)))
+        self._attr_hvac_mode = HVACMode(device.get("initial_hvac_mode", "off"))
         self.configure_capabilities(device)
 
     def configure_capabilities(self, device):
+        self._attr_temperature_unit = UnitOfTemperature.FAHRENHEIT if device.get("temperature_unit") == "F" else UnitOfTemperature.CELSIUS
+        self._attr_precision = device.get("precision", 0.1)
         self._attr_hvac_modes = [HVACMode(v) for v in device.get("hvac_modes", HVAC_MODES)]
         self._attr_fan_modes = device.get("fan_modes", FAN_MODES)
         self._attr_swing_modes = device.get("swing_modes", [])
@@ -45,6 +57,11 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
             self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
         if self._attr_swing_modes:
             self._attr_supported_features |= ClimateEntityFeature.SWING_MODE
+        self._attr_supported_features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+        away = device.get("away_temp", 0)
+        self._attr_preset_modes = ["none", "away"] if away else []
+        if away:
+            self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
         if self._attr_hvac_mode not in self._attr_hvac_modes:
             self._attr_hvac_mode = HVACMode.OFF
         if self._attr_fan_mode not in self._attr_fan_modes:
@@ -61,7 +78,72 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
             self._attr_fan_mode = last.attributes.get("fan_mode", "auto")
         self.configure_capabilities(self.device)
         self._attr_target_temperature = max(self.min_temp, min(self.target_temperature, self.max_temp))
+        self._subscribe_linked_entities()
+        self.async_on_remove(self._remove_linked_entities)
         self.hub.notify()
+
+    @callback
+    def _remove_linked_entities(self):
+        if self._remove_linked:
+            self._remove_linked()
+            self._remove_linked = None
+
+    def _subscribe_linked_entities(self):
+        if self._remove_linked:
+            self._remove_linked()
+            self._remove_linked = None
+        entity_ids = [self.device.get(key) for key in ("temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor")]
+        entity_ids = [entity_id for entity_id in entity_ids if entity_id]
+        if entity_ids:
+            self._remove_linked = async_track_state_change_event(self.hass, entity_ids, self._linked_state_changed)
+        self._refresh_linked_state()
+
+    @callback
+    def _linked_state_changed(self, event):
+        self._refresh_linked_state()
+        self.async_write_ha_state()
+
+    @callback
+    def _refresh_linked_state(self):
+        temperature = self.hass.states.get(self.device.get("temperature_sensor", ""))
+        self._attr_current_temperature = self._state_number(temperature, temperature=True)
+        humidity = self.hass.states.get(self.device.get("humidity_sensor", ""))
+        self._attr_current_humidity = self._state_number(humidity)
+        power = self.hass.states.get(self.device.get("power_sensor", ""))
+        if power and power.state not in ("unknown", "unavailable"):
+            if power.state.lower() in ("off", "false", "0") and self._attr_hvac_mode != HVACMode.OFF:
+                self._last_active_mode = self._attr_hvac_mode
+                self._attr_hvac_mode = HVACMode.OFF
+            elif power.state.lower() in ("on", "true", "1") and self._attr_hvac_mode == HVACMode.OFF:
+                mode = self._last_active_mode if self.device.get("keep_mode_on_power_on") else HVACMode(self.device.get("initial_hvac_mode", "auto"))
+                self._attr_hvac_mode = mode if mode != HVACMode.OFF else next(v for v in self.hvac_modes if v != HVACMode.OFF)
+
+    def _state_number(self, state, temperature=False):
+        if state is None or state.state in ("unknown", "unavailable"):
+            return None
+        try:
+            value = float(state.state)
+            if temperature:
+                source = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+                if source in (UnitOfTemperature.CELSIUS, UnitOfTemperature.FAHRENHEIT) and source != self.temperature_unit:
+                    value = TemperatureConverter.convert(value, source, self.temperature_unit)
+            return round(value, 2)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def available(self):
+        entity_id = self.device.get("availability_sensor")
+        if not entity_id:
+            return True
+        if self.hass is None:
+            return False
+        state = self.hass.states.get(entity_id)
+        return state is not None and state.state.lower() not in ("off", "false", "0", "unknown", "unavailable")
+
+    @property
+    def assumed_state(self):
+        return not bool(self.device.get("power_sensor"))
 
     @property
     def extra_state_attributes(self):
@@ -77,6 +159,8 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         self._attr_target_temperature = max(self._attr_min_temp, min(self._attr_target_temperature, self._attr_max_temp))
         self.configure_capabilities(device)
         super().apply_device(device)
+        if self.hass is not None:
+            self._subscribe_linked_entities()
 
     @property
     def swing_mode(self):
@@ -110,14 +194,19 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
                     raise ValueError("Temperature outside configured device range")
                 if mode not in self.hvac_modes or (self.fan_modes and fan not in self.fan_modes):
                     raise ValueError("Invalid mode or fan speed")
+                encoded_temperature = temperature
+                if mode == HVACMode.OFF and self.device.get("ignore_off_temperature") and self._previous:
+                    encoded_temperature = self._previous.get("Temp", temperature)
                 state = {**(self._previous or {}), **(extra or {}), "Power": mode != HVACMode.OFF, "Mode": "fan" if mode == HVACMode.FAN_ONLY else mode,
-                         "Temp": temperature, "FanSpeed": fan}
+                         "Temp": encoded_temperature, "FanSpeed": fan}
                 signal, state = await self.hub.hvac(self.device, state, self._previous)
             except (ValueError, TypeError, OverflowError) as err:
                 raise HomeAssistantError(str(err)) from err
             await self.hub.send(self.device, signal)
             self._previous = state
             self._attr_hvac_mode, self._attr_target_temperature, self._attr_fan_mode = mode, temperature, fan
+            if mode != HVACMode.OFF:
+                self._last_active_mode = mode
             self.async_write_ha_state()
             self.hub.notify()
 
@@ -129,6 +218,27 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
 
     async def async_set_fan_mode(self, fan_mode):
         await self._set(fan=fan_mode)
+
+    async def async_turn_on(self):
+        mode = self._last_active_mode if self.device.get("keep_mode_on_power_on") else HVACMode(self.device.get("initial_hvac_mode", "auto"))
+        if mode == HVACMode.OFF:
+            mode = next(value for value in self.hvac_modes if value != HVACMode.OFF)
+        await self._set(mode=mode)
+
+    async def async_turn_off(self):
+        await self._set(mode=HVACMode.OFF)
+
+    async def async_set_preset_mode(self, preset_mode):
+        if preset_mode not in ("none", "away") or not self.device.get("away_temp"):
+            raise HomeAssistantError("Away preset is not enabled")
+        if preset_mode == "away":
+            self._pre_away_temperature = self.target_temperature
+            self._attr_preset_mode = "away"
+            await self._set(temperature=self.device["away_temp"])
+        else:
+            target = self._pre_away_temperature or self.device.get("initial_target_temp", self.target_temperature)
+            self._attr_preset_mode = None
+            await self._set(temperature=target)
 
     async def async_irhvac(self, command):
         try:

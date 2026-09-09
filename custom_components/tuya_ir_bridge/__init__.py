@@ -39,7 +39,7 @@ async def async_setup_entry(hass, entry):
         hass, webcomponent_name="zigbee-ir-ready-panel",
         sidebar_title="Zigbee IR Ready", sidebar_icon="mdi:remote",
         frontend_url_path="zigbee-ir-ready",
-        module_url=f"/{DOMAIN}_static/manager.js?v=0.3.2",
+        module_url=f"/{DOMAIN}_static/manager.js?v={_VERSION}",
         embed_iframe=False, require_admin=True,
     )
     return True

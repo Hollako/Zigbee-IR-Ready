@@ -27,7 +27,7 @@
  *       hidden_groups: [keypad, colors, channels]
  */
 
-const CARD_VERSION = "3.0.1";
+const CARD_VERSION = "0.4.0";
 const MAX_REMOTES  = 4;
 
 // ── Button group definitions ──────────────────────────────────────────────────
@@ -1454,6 +1454,9 @@ if (!window.customCards.some(c => c.type === "zigbee-ir-ready-remote-card")) {
     preview:     false,
     documentationURL: "https://github.com/Hollako/Zigbee-IR-Ready",
   });
+  // If this module loads after Lovelace was opened, rebuild the card picker so
+  // the newly registered card appears without restarting the browser.
+  window.dispatchEvent(new Event("ll-rebuild"));
 }
 
 console.info(

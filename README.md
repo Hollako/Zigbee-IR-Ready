@@ -143,31 +143,37 @@ gaps in some MIDEA, CARRIER_AC40 and MULTIBRACKETS requests, and an upstream YOR
 common-HVAC dispatch failure. Other entries need specific models/state lengths.
 Physical testing remains necessary.
 
-The panel adapts the Tasmota IR Ready editor and remote card. Automatic blaster
-discovery, source-cycle tracking and online profile browsing
-remain future work. It is not a complete replica of every Tasmota feature.
+The panel adapts the Tasmota IR Ready editor and remote card. Tasmota feedback
+topics are represented by optional linked Home Assistant temperature, humidity,
+power and availability entities. Online profile browsing remains future work.
 
 ### Tabbed editor, learning and remotes (0.3.0)
 
+- **Climate → Connection:** configure the Zigbee2MQTT command topic, transport,
+  protocol/model, send delay, and optional Home Assistant temperature, humidity,
+  power and availability entities.
 - **Climate → Capabilities:** select the HVAC modes, fan speeds and swing
-  positions exposed in Home Assistant. Off is always included. Select no fan or
-  swing options to hide those controls. These choices describe your appliance;
-  they cannot add hardware features absent from its protocol.
-- **Climate → Behavior & Switches:** choose individual feature switches, grouped
+  positions exposed in Home Assistant, plus initial mode/target, display
+  precision, temperature unit and an optional Away temperature. Off is always
+  included. Select no fan or swing options to hide those controls.
+- **Climate → Behavior:** choose individual feature switches, grouped
   under the same Home Assistant device. They change the current IR state, which
-  is reused by later commands. Initial feature values only seed that state.
+  is reused by later commands. Configure sleep, default vertical/horizontal
+  swing, initial feature values, power-on mode retention and off-temperature
+  behavior.
   Deselecting a feature makes its existing switch unavailable, preserving its
   identity if you enable it again. Sleep uses the configured minutes (0 means
   the protocol's default). IR feature state is optimistic.
 - **Remote / Media / Light:** edit commands in Power & Volume, Navigation,
   Playback, Channels & Colors, Keypad, Sources and Custom Commands tabs.
-  Enter Bits and hexadecimal Data, or expand Advanced for full IRsend objects.
+  Each command has one hexadecimal code field plus Learn and Test buttons.
   Direct source commands named `source:HDMI 1` become media-player sources.
 - **Learn:** point the original remote at the same Zigbee blaster and press a
   button. Learning waits up to 30 seconds and ignores retained MQTT messages.
-  The captured code fills the command; **Test** transmits it, and **Save Changes**
-  persists it. Cancel stops waiting; the blaster's own learning window may stay
-  open until it times out. Learned commands use the Zosung 38 kHz assumption.
+  Recognized signals fill the field with decoded hexadecimal data; unknown
+  signals retain their raw timing payload internally. **Test** transmits it and
+  **Save Changes** persists it. Cancel stops waiting; the blaster's own learning
+  window may stay open until it times out. Raw learned commands use 38 kHz.
   This is optional button learning, not a replacement for generated HVAC state.
 - **Lovelace remote card:** add **Zigbee IR Ready Remote** from the dashboard's
   Add Card picker. It provides navigation, volume, keypad, source and custom

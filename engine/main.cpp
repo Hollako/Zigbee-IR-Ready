@@ -6,7 +6,9 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 #include "IRac.h"
+#include "IRrecv.h"
 #include "IRsend.h"
+#include "IRsend_test.h"
 #include "IRutils.h"
 #include "send_names.h"
 using json = nlohmann::json;
@@ -31,7 +33,7 @@ stdAc::state_t ac_state(const json &j) {
   state.power = j.value("Power", true);
   state.degrees = j.value("Temp", 24.0);
   if (!std::isfinite(state.degrees) || state.degrees < 0 || state.degrees > 50) throw std::runtime_error("Temperature outside 0..50");
-  state.celsius = true;
+  state.celsius = j.value("Celsius", true);
   state.mode = IRac::strToOpmode(string_value(j,"Mode","Auto").c_str());
   state.fanspeed = IRac::strToFanspeed(string_value(j,"FanSpeed","Auto").c_str());
   state.swingv = IRac::strToSwingV(string_value(j,"SwingV","Off").c_str());
@@ -57,6 +59,38 @@ json run(const json &j) {
       send.push_back({{"name",name},{"bits",IRsend::defaultBits(type)},{"state",hasACState(type)}});
     }
     return {{"climate",climate},{"send",send},{"api",1}};
+  }
+  if(op=="decode") {
+    const auto timings=j.at("timings").get<std::vector<uint32_t>>();
+    if(timings.empty() || timings.size()>4096) throw std::runtime_error("Expected 1..4096 timings");
+    IRsendTest capture(0);
+    capture.capture.decode_type=UNKNOWN;
+    capture.capture.bits=0;
+    capture.capture.rawbuf=capture.rawbuf;
+    capture.capture.rawlen=timings.size()+1;
+    capture.capture.overflow=false;
+    capture.capture.repeat=false;
+    capture.capture.value=0;
+    capture.capture.address=0;
+    capture.capture.command=0;
+    capture.rawbuf[0]=0;
+    for(size_t i=0;i<timings.size();i++) {
+      if(!timings[i] || timings[i]>65535) throw std::runtime_error("Invalid timing");
+      capture.rawbuf[i+1]=std::max<uint32_t>(1,timings[i]/kRawTick);
+    }
+    IRrecv receiver(0, timings.size()+2);
+    const bool decoded=receiver.decode(&capture.capture);
+    if(!decoded || capture.capture.decode_type==UNKNOWN)
+      return {{"recognized",false}};
+    return {
+      {"recognized",true},
+      {"protocol",typeToString(capture.capture.decode_type).c_str()},
+      {"bits",capture.capture.bits},
+      {"data",resultToHexidecimal(&capture.capture).c_str()},
+      {"address",capture.capture.address},
+      {"command",capture.capture.command},
+      {"repeat",capture.capture.repeat}
+    };
   }
   pulses.clear();
   if(op=="hvac") {

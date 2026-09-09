@@ -91,6 +91,17 @@ class EngineTests(unittest.TestCase):
                 self.assertTrue(result['pulses'])
                 signal.prepare_signal(result)
 
+    def test_generated_signal_decodes_to_hex(self):
+        sent=request({'op':'send','command':{'Protocol':'NEC','Bits':32,'Data':'0x20DF10EF'}})
+        timings=[abs(pulse[0]) for pulse in sent['pulses']]
+        decoded=request({'op':'decode','timings':timings})
+        self.assertEqual(decoded['protocol'],'NEC')
+        self.assertEqual(decoded['bits'],32)
+        self.assertEqual(decoded['data'],'0x20DF10EF')
+
+    def test_unrecognized_signal_is_reported_without_inventing_hex(self):
+        self.assertEqual(request({'op':'decode','timings':[111,222,333,444,555]}),{'recognized':False})
+
     def test_non_byte_aligned_state(self):
         result=request({'op':'send','command':{'Protocol':'CARRIER_AC84','Bits':84,'Data':'00'*11}})
         self.assertTrue(result['pulses'])
