@@ -98,7 +98,7 @@ export function mountEditor(panel,form,selected,values,capture) {
   async function action(name,data,button){if(button)button.disabled=true;try{await panel._hass.callWS({type:'tuya_ir_bridge/action',action:name,data});panel.status('Command sent.');}catch(error){panel.status(error.message||String(error));}finally{if(button)button.disabled=false;}}
   function syncCommands(){try{const map={};for(const input of form.querySelectorAll('[data-command]')){if(input.value.trim())map[input.dataset.command]=JSON.parse(input.value);}field('command_map').value=JSON.stringify(map,null,2);capture();return map;}catch(error){panel.status('Command must be an IRsend JSON object or a learned code object.');throw error;}}
   function commandRow(section,name,command){
-    const row=document.createElement('div');row.className='command-row';row.innerHTML=`<span class="command-name">${esc(commandLabel(name))}</span><input class="command-code" type="text" aria-label="${esc(commandLabel(name))} IR code" spellcheck="false" autocomplete="off" placeholder="0x20DF10EF"><textarea data-command="${esc(name)}" aria-label="${esc(name)} stored command" hidden></textarea><button type="button" data-learn>Learn</button><button type="button" data-test>Test</button>`;
+    const row=document.createElement('div');row.className='command-row';row.innerHTML=`<span class="command-name">${esc(commandLabel(name))}</span><input class="command-code" type="text" aria-label="${esc(commandLabel(name))} IR code" spellcheck="false" autocomplete="off" placeholder="0x20DF10EF"><textarea data-command="${esc(name)}" aria-label="${esc(name)} stored command" hidden></textarea><button type="button" data-learn><ha-icon icon="mdi:magic-staff"></ha-icon><span>Learn</span></button><button type="button" data-test><ha-icon icon="mdi:play"></ha-icon><span>Test</span></button>`;
     const input=row.querySelector('textarea'),code=row.querySelector('.command-code');
     input.value=values._command_drafts?.[name] ?? (command===undefined?'':JSON.stringify(command));
     const defaultBits=()=>panel.catalogue.send.find(item=>item.name===field('protocol').value)?.bits||32;
@@ -152,8 +152,11 @@ export function mountEditor(panel,form,selected,values,capture) {
           if(result.status==='learned'){
             input.value=JSON.stringify(result.command||{Learned:result.code});input.dispatchEvent(new Event('learned'));syncCommands();
             const decoded=result.command?.Data?`${result.command.Protocol}, ${result.command.Bits} bits: ${result.command.Data}`:'raw timing signal';
-            message.textContent=`Command learned as ${decoded}. Close this window to test it, then save the device.`;close.textContent='Done';
-            panel.status(`Command learned as ${decoded}. Test it, then save the device.`);return;
+            message.textContent=`Success — command learned as ${decoded}. This window will close automatically.`;close.textContent='Close';
+            panel.status(`Command learned as ${decoded}. Test it, then save the device.`);
+            await new Promise(resolve=>setTimeout(resolve,1400));
+            if(!closed)await dismiss();
+            return;
           }
           if(result.status!=='waiting')throw Error(result.error||`Learning ${result.status}. Try again.`);
         }

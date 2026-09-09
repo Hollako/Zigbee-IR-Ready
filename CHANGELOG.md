@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Display Learn buttons in orange with a wand icon and Test buttons in green
+  with a play icon. Automatically close the learning dialog after showing its
+  success message.
+
 ## 0.4.0
 
 - Match the Tasmota-style AC editor with Connection, Capabilities and Behavior
