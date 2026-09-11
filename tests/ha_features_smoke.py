@@ -47,12 +47,16 @@ async def main():
         except ValueError:pass
         else:raise AssertionError('Invalid capabilities accepted')
     code=raw_to_tuya([9000,4500,560,1690,560])
-    media=await hub.create({'name':'TV','device_type':'media_player','protocol':'NEC','topic':config['topic'],'transport':'base64','commands':{key:{'Learned':code} for key in ('turn_on','turn_off','volume_up','volume_down','source:HDMI 1')}})
+    media=await hub.create({'name':'TV','device_type':'media_player','protocol':'NEC','topic':config['topic'],'transport':'base64','commands':{key:{'Learned':code} for key in ('turn_on','turn_off','volume_up','volume_down','source_cycle','source:HDMI 1')}})
     mp=IRMediaPlayer(hub,media);mp.async_write_ha_state=Mock();hub.entities['media_player.test']=mp
     remote=IRRemote(hub,media);assert remote.unique_id!=mp.unique_id
-    assert mp.source_list==['HDMI 1']
+    assert mp.source_list==['Input','HDMI 1']
+    assert remote.extra_state_attributes['source_list']==['HDMI 1']
     with patch.object(hub,'send',new_callable=AsyncMock) as send:
-        await mp.async_select_source('HDMI 1');await remote.send_command('power_on');assert send.await_count==2
+        await mp.async_select_source('Input');assert mp.source is None
+        await mp.async_select_source('Input');assert mp.source is None
+        await mp.async_select_source('HDMI 1');assert mp.source=='HDMI 1'
+        await remote.send_command('power_on');assert send.await_count==4
     callback=None;unsub=Mock()
     async def subscribe(hass,topic,handler,**kwargs):
         nonlocal callback

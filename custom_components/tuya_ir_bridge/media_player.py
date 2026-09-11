@@ -2,6 +2,8 @@
 from homeassistant.components.media_player import MediaPlayerEntity, MediaPlayerEntityFeature, MediaPlayerState
 from .entity import IREntity, setup_platform
 
+SOURCE_CYCLE_OPTION = "Input"
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     setup_platform(hass, entry, async_add_entities, "media_player", IRMediaPlayer)
@@ -25,9 +27,20 @@ class IRMediaPlayer(IREntity, MediaPlayerEntity):
 
     @property
     def source_list(self):
-        return [key[7:] for key in self.device.get('commands', {}) if key.startswith('source:')]
+        commands = self.device.get('commands', {})
+        direct = [key[7:] for key in commands if key.startswith('source:')]
+        if 'source_cycle' not in commands:
+            return direct
+        return [SOURCE_CYCLE_OPTION, *[source for source in direct if source != SOURCE_CYCLE_OPTION]]
 
     async def async_select_source(self, source):
+        if source == SOURCE_CYCLE_OPTION and 'source_cycle' in self.device.get('commands', {}):
+            await self.send_command('source_cycle')
+            # A cycle command does not reveal the resulting input. Clearing the
+            # optimistic value also lets Home Assistant select Input repeatedly.
+            self._attr_source = None
+            self.async_write_ha_state()
+            return
         await self.send_command('source:' + source)
         self._attr_source = source
         self.async_write_ha_state()

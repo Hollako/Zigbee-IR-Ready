@@ -27,7 +27,7 @@
  *       hidden_groups: [keypad, colors, channels]
  */
 
-const CARD_VERSION = "0.4.1";
+const CARD_VERSION = "0.4.2";
 const MAX_REMOTES  = 4;
 
 // ── Button group definitions ──────────────────────────────────────────────────
@@ -76,6 +76,21 @@ const GROUP_DEFS = [
     ],
   },
   {
+    id: "playback",
+    label: "Playback",
+    layout: "row",
+    buttons: [
+      { cmd: "previous",     icon: "mdi:skip-previous", label: "Previous"     },
+      { cmd: "rewind",       icon: "mdi:rewind",        label: "Rewind"       },
+      { cmd: "play",         icon: "mdi:play",          label: "Play"         },
+      { cmd: "play_pause",   icon: "mdi:play-pause",    label: "Play / Pause" },
+      { cmd: "pause",        icon: "mdi:pause",         label: "Pause"        },
+      { cmd: "stop",         icon: "mdi:stop",          label: "Stop"         },
+      { cmd: "fast_forward", icon: "mdi:fast-forward",  label: "Fast Forward" },
+      { cmd: "next",         icon: "mdi:skip-next",     label: "Next"         },
+    ],
+  },
+  {
     id: "dpad",
     label: "D-Pad",
     layout: "dpad",
@@ -117,6 +132,7 @@ const KNOWN_CMDS = new Set([
   "channel_up", "channel_down",
   "up", "down", "left", "right", "ok",
   "back", "home", "menu", "info", "exit", "settings",
+  "play", "pause", "play_pause", "stop", "next", "previous", "rewind", "fast_forward",
   "red", "green", "yellow", "blue",
   "digit_0","digit_1","digit_2","digit_3","digit_4",
   "digit_5","digit_6","digit_7","digit_8","digit_9",

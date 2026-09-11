@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.2
+
+- Add a Cycle Source command to the Sources editor. Media players expose it as
+  an Input action that can be selected repeatedly, while retaining direct source
+  commands. The Lovelace remote card displays the matching input-cycle button.
+- Display playback controls on the remote card with recognizable Material Design
+  icons for play, pause, play/pause, stop, previous, next, rewind and fast-forward.
+- Return immediately after publishing an IR command to MQTT so one blaster's
+  cooldown does not delay later automation actions. Consecutive commands to the
+  same blaster still observe safe transmission spacing.
+
 ## 0.4.1
 
 - Display Learn buttons in orange with a wand icon and Test buttons in green

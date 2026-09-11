@@ -5,7 +5,7 @@ const fans=['auto','min','low','medium','high','max'];
 const swings=['off','vertical','horizontal','both','highest','high','middle','low','lowest','left max','left','horizontal middle','right','right max','wide'];
 const features=['SwingV','SwingH','Quiet','Turbo','Econo','Light','Filter','Clean','Beep','Sleep','iFeel'];
 const groups={power:['power','turn_on','turn_off','volume_up','volume_down','mute'],navigation:['up','down','left','right','ok','back','home','menu','settings','info','exit'],playback:['play','pause','play_pause','stop','next','previous','rewind','fast_forward'],channels:['channel_up','channel_down','red','green','yellow','blue'],keypad:Array.from({length:10},(_,i)=>`digit_${i}`)};
-const commandLabel=name=>({power:'Power Toggle',turn_on:'Power On',turn_off:'Power Off',play_pause:'Play / Pause',volume_up:'Volume Up',volume_down:'Volume Down',channel_up:'Channel Up',channel_down:'Channel Down',fast_forward:'Fast Forward'}[name]||name.replace(/^source:/,'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()));
+const commandLabel=name=>({power:'Power Toggle',turn_on:'Power On',turn_off:'Power Off',play_pause:'Play / Pause',volume_up:'Volume Up',volume_down:'Volume Down',channel_up:'Channel Up',channel_down:'Channel Down',fast_forward:'Fast Forward',source_cycle:'Cycle Source'}[name]||name.replace(/^source:/,'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()));
 export function mountEditor(panel,form,selected,values,capture) {
   const root=panel.shadowRoot, field=name=>form.elements.namedItem(name);
   let advancedEdited=false;
@@ -77,7 +77,8 @@ export function mountEditor(panel,form,selected,values,capture) {
     let commands={};try{commands=JSON.parse(field('command_map').value||'{}');}catch{/* Validation reports malformed stored data. */}
     const known=new Set(Object.values(groups).flat());
     for(const [key,names] of Object.entries(groups)){const section=pane(key,{power:'Power & Volume',navigation:'Navigation',playback:'Playback',channels:'Channels & Colors',keypad:'Keypad'}[key]);for(const name of names)commandRow(section,name,commands[name]);}
-    const sources=pane('sources','Sources');sources.innerHTML='<p class="help">Name direct source commands source:HDMI 1, source:TV, etc. Media players expose these in Home Assistant.</p>';
+    const sources=pane('sources','Sources');sources.innerHTML='<p class="help">Learn Cycle Source from the physical Input/Source button to advance one input per press. You can also add direct source commands such as HDMI 1 or TV. Media players expose both methods in Home Assistant.</p>';
+    commandRow(sources,'source_cycle',commands.source_cycle);known.add('source_cycle');
     const custom=pane('custom','Custom Commands');
     for(const [name,command] of Object.entries(commands)){if(!known.has(name))commandRow(name.startsWith('source:')?sources:custom,name,command);}
     for(const [section,isSource] of [[sources,true],[custom,false]]){const wrapper=document.createElement('div');wrapper.innerHTML=`<input aria-label="${isSource?'Source name':'Command name'}" placeholder="${isSource?'HDMI 1':'netflix'}"><button type="button">Add ${isSource?'Source':'Command'}</button>`;wrapper.querySelector('button').onclick=()=>{const name=(isSource?'source:':'')+wrapper.querySelector('input').value.trim();if(!name||name==='source:')return;if([...form.querySelectorAll('[data-command]')].some(n=>n.dataset.command===name)){panel.status('This command already exists.');return;}commandRow(section,name);wrapper.querySelector('input').value='';};section.append(wrapper);}

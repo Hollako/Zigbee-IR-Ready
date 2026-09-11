@@ -115,7 +115,7 @@ class Hub:
         self.hass, self.entry = hass, entry
         self.store = Store(hass, 1, f"{DOMAIN}.devices")
         self.devices, self.adders, self.entities = [], {}, {}
-        self.lock, self.tx_locks = asyncio.Lock(), {}
+        self.lock, self.tx_locks, self.tx_ready = asyncio.Lock(), {}, {}
         self.feature_entities, self.listeners = {}, set()
         self.deleted = set()
         from .learning import LearningManager
@@ -291,9 +291,16 @@ class Hub:
         payload, duration = prepare_signal(signal, device.get("transport", "base64"))
         topic = device["topic"]
         async with self.tx_locks.setdefault(topic, asyncio.Lock()):
+            loop = asyncio.get_running_loop()
+            wait = self.tx_ready.get(topic, 0) - loop.time()
+            if wait > 0:
+                await asyncio.sleep(wait)
             if device.get("id") in self.deleted:
                 raise ValueError("This virtual device has been deleted")
             if any(s["topic"] == topic and s["status"] == "waiting" for s in self.learning.sessions.values()):
                 raise ValueError("The blaster is learning. Finish or cancel learning before sending")
             await mqtt.async_publish(self.hass, topic, payload, qos=0, retain=False)
-            await asyncio.sleep(max(0.5, duration + 0.1, device.get("mqtt_delay", 0)))
+            # Return as soon as MQTT accepts the command so unrelated automation
+            # actions are not held for at least 500 ms. The next transmission to
+            # this same blaster observes the cooldown before it is published.
+            self.tx_ready[topic] = loop.time() + max(0.5, duration + 0.1, device.get("mqtt_delay", 0))

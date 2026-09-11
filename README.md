@@ -167,7 +167,9 @@ power and availability entities. Online profile browsing remains future work.
 - **Remote / Media / Light:** edit commands in Power & Volume, Navigation,
   Playback, Channels & Colors, Keypad, Sources and Custom Commands tabs.
   Each command has one hexadecimal code field plus Learn and Test buttons.
-  Direct source commands named `source:HDMI 1` become media-player sources.
+  Learn **Cycle Source** from the physical Input/Source button to advance one
+  input per press, or add direct commands named `source:HDMI 1`. Media players
+  expose the repeatable **Input** action together with direct sources.
 - **Learn:** point the original remote at the same Zigbee blaster and press a
   button. Learning waits up to 30 seconds and ignores retained MQTT messages.
   Recognized signals fill the field with decoded hexadecimal data; unknown
