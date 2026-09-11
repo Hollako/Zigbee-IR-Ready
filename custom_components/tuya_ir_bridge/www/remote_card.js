@@ -27,7 +27,7 @@
  *       hidden_groups: [keypad, colors, channels]
  */
 
-const CARD_VERSION = "0.4.4";
+const CARD_VERSION = "0.4.5";
 const MAX_REMOTES  = 4;
 
 // ── Button group definitions ──────────────────────────────────────────────────
@@ -1264,10 +1264,16 @@ ha-card { overflow: hidden; border-radius: 12px; }
   gap: 8px;
   width: 100%;
 }
-.playback-track-row { margin-top: 8px; }
+.playback-track-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  max-width: 324px;
+  margin-top: 8px;
+}
 .playback-track-row .playback-track-btn {
-  flex: 1 1 120px;
-  max-width: 220px;
+  width: 100%;
+  min-width: 0;
 }
 
 /* ── VDC zone ──────────────────────────────────────────────── */

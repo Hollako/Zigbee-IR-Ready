@@ -21,10 +21,20 @@ async def main():
     hub=Hub(hass,SimpleNamespace());await hub.load()
     added=[]
     for kind in ('climate','remote','media_player','light','switch'):hub.adders[kind]=added.append
-    config={'name':'AC','device_type':'climate','protocol':'ELECTRA_AC','topic':'Zigbee/Test/set/ir_code_to_send','transport':'base64','hvac_modes':['off','cool'],'fan_modes':['auto','high'],'swing_modes':['off','vertical'],'feature_switches':['Light','SwingV'],'hvac_options':{'Light':False},'initial_hvac_mode':'cool','initial_target_temp':23,'precision':0.5,'away_temp':18,'keep_mode_on_power_on':True,'ignore_off_temperature':True,'temperature_sensor':'sensor.room_temperature','humidity_sensor':'sensor.room_humidity','availability_sensor':'binary_sensor.blaster','mqtt_delay':0}
+    config={'name':'AC','device_type':'climate','protocol':'ELECTRA_AC','topic':'Zigbee/Test/set/ir_code_to_send','transport':'base64','hvac_modes':['off','cool'],'fan_modes':['auto','high'],'swing_modes':['off','vertical'],'feature_switches':['Light','SwingV'],'hvac_options':{'Light':False},'initial_hvac_mode':'cool','initial_target_temp':23,'precision':0.5,'away_temp':18,'keep_mode_on_power_on':True,'ignore_off_temperature':True,'temperature_sensor':'sensor.room_temperature','humidity_sensor':'sensor.room_humidity','availability_topic':'Zigbee/Test/availability','mqtt_delay':0}
     device=await hub.create(config);ac=IRClimate(hub,device);ac.async_write_ha_state=Mock();ac.hass=hass;hub.entities['climate.test']=ac
-    hass.states.async_set('sensor.room_temperature','68',{'unit_of_measurement':'°F'});hass.states.async_set('sensor.room_humidity','47');hass.states.async_set('binary_sensor.blaster','on')
-    ac._subscribe_linked_entities();assert ac.current_temperature==20 and ac.current_humidity==47 and ac.available
+    hass.states.async_set('sensor.room_temperature','68',{'unit_of_measurement':'°F'});hass.states.async_set('sensor.room_humidity','47')
+    ac._subscribe_linked_entities();assert ac.current_temperature==20 and ac.current_humidity==47
+    availability_callback=None;availability_unsub=Mock()
+    async def subscribe_availability(hass,topic,handler,**kwargs):
+        nonlocal availability_callback
+        assert topic=='Zigbee/Test/availability';availability_callback=handler;return availability_unsub
+    with patch('custom_components.tuya_ir_bridge.climate.mqtt.async_subscribe',side_effect=subscribe_availability):
+        await ac._async_subscribe_availability()
+    assert not ac.available
+    availability_callback(SimpleNamespace(payload='online'));assert ac.available
+    availability_callback(SimpleNamespace(payload=json.dumps({'state':'offline'})));assert not ac.available
+    availability_callback(SimpleNamespace(payload=json.dumps({'availability':'online'})));assert ac.available
     toggle=IRFeatureSwitch(hub,device,'Light')
     assert toggle.assumed_state is False
     assert ac.hvac_modes==['off','cool'] and ac.fan_modes==['auto','high']
@@ -74,6 +84,6 @@ async def main():
         other=await hub.learning.start(config['topic']);await asyncio.sleep(0)
         await hub.learning.cancel(other['session']);assert hub.learning.status(other['session'])['status']=='cancelled'
         assert unsub.call_count==2
-    ac._remove_linked_entities();await hub.learning.close();await hass.async_stop()
+    ac._remove_linked_entities();availability_unsub.assert_called_once();await hub.learning.close();await hass.async_stop()
     print('Feature switches, selected capabilities, swing persistence, learned sends, media companions and learning cleanup passed')
 asyncio.run(main())

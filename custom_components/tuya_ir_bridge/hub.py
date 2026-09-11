@@ -17,7 +17,7 @@ from .commands import normalize_hvac, normalize_keys
 def validate_device(data, catalogue):
     if not isinstance(data, dict):
         raise ValueError("Device must be an object")
-    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes", "initial_hvac_mode", "initial_target_temp", "precision", "temperature_unit", "away_temp", "mqtt_delay", "temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor", "keep_mode_on_power_on", "ignore_off_temperature"}
+    allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes", "initial_hvac_mode", "initial_target_temp", "precision", "temperature_unit", "away_temp", "mqtt_delay", "temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor", "availability_topic", "keep_mode_on_power_on", "ignore_off_temperature"}
     if set(data) - allowed:
         raise ValueError("Unknown device fields")
     data = copy.deepcopy(data)
@@ -92,6 +92,10 @@ def validate_device(data, catalogue):
             if not isinstance(value, str) or len(value) > 255 or (value and "." not in value):
                 raise ValueError(f"Invalid {key}")
             data[key] = value
+        availability_topic = data.get("availability_topic", "")
+        if not isinstance(availability_topic, str) or len(availability_topic) > 512 or any(c in availability_topic for c in ("+", "#", "\x00")):
+            raise ValueError("Availability topic must be a concrete MQTT topic")
+        data["availability_topic"] = availability_topic.strip()
         for key in ("keep_mode_on_power_on", "ignore_off_temperature"):
             if type(data.get(key, False)) is not bool:
                 raise ValueError(f"Invalid {key}")

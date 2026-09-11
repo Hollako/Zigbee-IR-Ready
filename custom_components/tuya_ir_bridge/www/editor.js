@@ -41,13 +41,15 @@ export function mountEditor(panel,form,selected,values,capture) {
     control.className='field-input';control.name=name;control.value=values[name]??settings.default??'';row.append(control);container.append(row);extras[name]=()=>type==='number'?Number(control.value):control.value;return control;
   }
   function addToggle(container,name,label){const row=document.createElement('label');row.className='toggle-row';row.innerHTML=`<span class="field-label">${esc(label)}</span><input type="checkbox" name="${name}" ${values[name]?'checked':''}><span class="toggle-track"></span><span data-toggle-value>${values[name]?'Yes':'No'}</span>`;const input=row.querySelector('input');input.onchange=()=>row.querySelector('[data-toggle-value]').textContent=input.checked?'Yes':'No';container.append(row);extras[name]=()=>input.checked;}
-  function addEntity(container,name,label,domains){const options=[['','— None —'],...Object.values(panel._hass.states||{}).filter(state=>domains.includes(state.entity_id.split('.')[0])).sort((a,b)=>a.entity_id.localeCompare(b.entity_id)).map(state=>[state.entity_id,state.attributes?.friendly_name||state.entity_id])];return addField(container,name,label,'text',{options});}
+  function addEntity(container,name,label,filter){const options=[['','— None —'],...Object.values(panel._hass.states||{}).filter(filter).sort((a,b)=>a.entity_id.localeCompare(b.entity_id)).map(state=>[state.entity_id,state.attributes?.friendly_name||state.entity_id])];return addField(container,name,label,'text',{options});}
   if(climate){
     addField(connection,'mqtt_delay','MQTT Delay (seconds)','number',{default:0,attrs:{min:0,max:60,step:.1}});
-    addEntity(connection,'temperature_sensor','Temperature Sensor',['sensor','input_number']);
-    addEntity(connection,'humidity_sensor','Humidity Sensor',['sensor','input_number']);
-    addEntity(connection,'power_sensor','Power Sensor',['binary_sensor','switch','input_boolean']);
-    addEntity(connection,'availability_sensor','Availability Sensor',['binary_sensor','sensor','input_boolean']);
+    const domain=state=>state.entity_id.split('.')[0],deviceClass=state=>state.attributes?.device_class,unit=state=>state.attributes?.unit_of_measurement;
+    addEntity(connection,'temperature_sensor','Temperature Sensor',state=>(domain(state)==='sensor'&&deviceClass(state)==='temperature')||(domain(state)==='input_number'&&['°C','°F'].includes(unit(state))));
+    addEntity(connection,'humidity_sensor','Humidity Sensor',state=>(domain(state)==='sensor'&&deviceClass(state)==='humidity')||(domain(state)==='input_number'&&unit(state)==='%'));
+    addEntity(connection,'power_sensor','Power Sensor',state=>['switch','input_boolean'].includes(domain(state))||(domain(state)==='binary_sensor'&&['power','running','plug'].includes(deviceClass(state))));
+    addField(connection,'availability_topic','Availability Topic','text',{attrs:{placeholder:'zigbee2mqtt/Bedroom IR/availability'}});
+    const availabilityHelp=document.createElement('p');availabilityHelp.className='help';availabilityHelp.textContent='Copy the device availability topic from Zigbee2MQTT. Plain online/offline payloads and JSON state payloads are supported.';connection.append(availabilityHelp);
     const capabilities=pane('capabilities','Capabilities');
     checklist(capabilities,'hvac_modes','HVAC Modes',modes,modes);
     checklist(capabilities,'fan_modes','Fan Speeds',fans,fans);

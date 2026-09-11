@@ -1,4 +1,6 @@
 """Climate using upstream IRac with per-device previous state."""
+import json
+from homeassistant.components import mqtt
 from homeassistant.components.climate import ClimateEntity, ClimateEntityFeature, HVACMode
 from homeassistant.const import UnitOfTemperature, ATTR_TEMPERATURE, ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.exceptions import HomeAssistantError
@@ -34,6 +36,9 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         super().__init__(hub, device)
         self._previous = None
         self._remove_linked = None
+        self._remove_availability = None
+        self._availability_task = None
+        self._mqtt_available = None
         self._attr_current_temperature = None
         self._attr_current_humidity = None
         self._attr_preset_mode = None
@@ -79,6 +84,7 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         self.configure_capabilities(self.device)
         self._attr_target_temperature = max(self.min_temp, min(self.target_temperature, self.max_temp))
         self._subscribe_linked_entities()
+        await self._async_subscribe_availability()
         self.async_on_remove(self._remove_linked_entities)
         self.hub.notify()
 
@@ -87,6 +93,46 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         if self._remove_linked:
             self._remove_linked()
             self._remove_linked = None
+        if self._availability_task and not self._availability_task.done():
+            self._availability_task.cancel()
+        self._availability_task = None
+        if self._remove_availability:
+            self._remove_availability()
+            self._remove_availability = None
+
+    async def _async_subscribe_availability(self):
+        if self._remove_availability:
+            self._remove_availability()
+            self._remove_availability = None
+        self._mqtt_available = None
+        topic = self.device.get("availability_topic")
+        if topic:
+            self._remove_availability = await mqtt.async_subscribe(self.hass, topic, self._availability_message, qos=0)
+
+    def _schedule_availability_subscription(self):
+        if self._availability_task and not self._availability_task.done():
+            self._availability_task.cancel()
+        self._availability_task = self.hass.async_create_task(self._async_subscribe_availability())
+
+    @callback
+    def _availability_message(self, message):
+        value = message.payload
+        try:
+            decoded = json.loads(value)
+            if isinstance(decoded, dict):
+                value = decoded.get("state", decoded.get("availability", decoded.get("status", value)))
+            elif isinstance(decoded, str):
+                value = decoded
+        except (TypeError, ValueError):
+            pass
+        value = str(value).strip().lower()
+        if value in ("online", "on", "true", "1", "available"):
+            self._mqtt_available = True
+        elif value in ("offline", "off", "false", "0", "unavailable"):
+            self._mqtt_available = False
+        else:
+            return
+        self.async_write_ha_state()
 
     def _subscribe_linked_entities(self):
         if self._remove_linked:
@@ -133,6 +179,8 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
 
     @property
     def available(self):
+        if self.device.get("availability_topic"):
+            return self._mqtt_available is True
         entity_id = self.device.get("availability_sensor")
         if not entity_id:
             return True
@@ -161,6 +209,7 @@ class IRClimate(IREntity, ClimateEntity, RestoreEntity):
         super().apply_device(device)
         if self.hass is not None:
             self._subscribe_linked_entities()
+            self._schedule_availability_subscription()
 
     @property
     def swing_mode(self):

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.5
+
+- Constrain the wider Previous and Next row to the main remote-control width so
+  it cannot expand the Lovelace card.
+- Filter linked climate entity selectors to matching temperature, humidity and
+  power categories. Replace new availability selections with a Zigbee2MQTT
+  availability topic subscription while retaining old saved entity links.
+
 ## 0.4.4
 
 - Split remote-card playback controls across two rows, with wider Previous and

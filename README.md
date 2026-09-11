@@ -151,7 +151,9 @@ power and availability entities. Online profile browsing remains future work.
 
 - **Climate → Connection:** configure the Zigbee2MQTT command topic, transport,
   protocol/model, send delay, and optional Home Assistant temperature, humidity,
-  power and availability entities.
+  and power entities. Temperature and humidity lists are filtered by device
+  class. Availability uses the Zigbee2MQTT device availability topic and accepts
+  retained plain `online`/`offline` or JSON state payloads.
 - **Climate → Capabilities:** select the HVAC modes, fan speeds and swing
   positions exposed in Home Assistant, plus initial mode/target, display
   precision, temperature unit and an optional Away temperature. Off is always
