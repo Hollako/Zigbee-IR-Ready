@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3
+
+- Version every JavaScript module imported by the sidebar manager so Home
+  Assistant browsers cannot reuse an older Sources editor after a HACS update.
+- Add a release regression test that keeps the manifest, remote card and all
+  imported frontend asset cache keys on the same version.
+
 ## 0.4.2
 
 - Add a Cycle Source command to the Sources editor. Media players expose it as

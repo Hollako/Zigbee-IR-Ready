@@ -18,9 +18,9 @@ function panel() {
     customElements: {get:()=>undefined, define:(_,component)=>{Component=component;}},
   });
   const source=readFileSync(path.join(__dirname,'../custom_components/tuya_ir_bridge/www/manager.js'),'utf8')
-    .replace("import './remote_card.js';", '')
-    .replace("import {CSS} from './panel.js';", "const CSS='';")
-    .replace("import {mountEditor} from './editor.js';", "const mountEditor=()=>{};");
+    .replace(/import '\.\/remote_card\.js\?v=[^']+';/, '')
+    .replace(/import \{CSS\} from '\.\/panel\.js\?v=[^']+';/, "const CSS='';")
+    .replace(/import \{mountEditor\} from '\.\/editor\.js\?v=[^']+';/, "const mountEditor=()=>{};");
   vm.runInContext(source, context);
   const instance = new Component();
   instance.catalogue={climate:['DAIKIN','ELECTRA_AC','GREE','MITSUBISHI_AC'],send:[{name:'NEC'},{name:'SAMSUNG'},{name:'SONY'},{name:'RC5'},{name:'RC6'}]};

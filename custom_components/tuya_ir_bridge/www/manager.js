@@ -1,9 +1,9 @@
 /* Device manager; CSS reused under MIT from Tasmota IR Ready. */
 // Register the Lovelace card whenever the manager is opened as a fallback for
 // browsers that started before Home Assistant injected the global module URL.
-import './remote_card.js';
-import {CSS} from './panel.js';
-import {mountEditor} from './editor.js';
+import './remote_card.js?v=0.4.3';
+import {CSS} from './panel.js?v=0.4.3';
+import {mountEditor} from './editor.js?v=0.4.3';
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const errorText = error => {
   const detail = error?.error || error;
