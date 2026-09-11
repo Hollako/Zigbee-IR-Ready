@@ -128,6 +128,15 @@ const root=path.resolve(__dirname,'..');
       assert.equal(await button.locator('ha-icon').getAttribute('icon'),icon);
       assert.equal(await button.locator('.b-lbl').count(),0);
     }
+    const playbackLayout=await page.evaluate(()=>{
+      const box=command=>document.querySelector(`zigbee-ir-ready-remote-card`).shadowRoot.querySelector(`[data-cmd="${command}"]`).getBoundingClientRect();
+      const play=box('play'),previous=box('previous'),next=box('next');
+      return {playTop:Math.round(play.top),previousTop:Math.round(previous.top),nextTop:Math.round(next.top),playWidth:Math.round(play.width),previousWidth:Math.round(previous.width),nextWidth:Math.round(next.width)};
+    });
+    assert.equal(playbackLayout.previousTop,playbackLayout.nextTop);
+    assert.notEqual(playbackLayout.playTop,playbackLayout.previousTop);
+    assert.ok(playbackLayout.previousWidth>playbackLayout.playWidth);
+    assert.ok(playbackLayout.nextWidth>playbackLayout.playWidth);
     await page.screenshot({path:path.join(root,'.build/panel-remotes.png'),fullPage:true});
     assert.deepEqual(errors,[]);
     console.log('Browser: dark/light colors, edit loading, stable update ID, and legacy address retention passed');

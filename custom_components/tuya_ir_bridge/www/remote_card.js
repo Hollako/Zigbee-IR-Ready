@@ -27,7 +27,7 @@
  *       hidden_groups: [keypad, colors, channels]
  */
 
-const CARD_VERSION = "0.4.3";
+const CARD_VERSION = "0.4.4";
 const MAX_REMOTES  = 4;
 
 // ── Button group definitions ──────────────────────────────────────────────────
@@ -78,7 +78,7 @@ const GROUP_DEFS = [
   {
     id: "playback",
     label: "Playback",
-    layout: "row",
+    layout: "playback",
     buttons: [
       { cmd: "previous",     icon: "mdi:skip-previous", label: "Previous"     },
       { cmd: "rewind",       icon: "mdi:rewind",        label: "Rewind"       },
@@ -923,6 +923,7 @@ class ZigbeeIrRemoteCard extends HTMLElement {
     if (!hasAny) return "";
     switch (group.layout) {
       case "power":  return this._renderPower(vis.filter(b => b && cmds.includes(b.cmd)), cmds, powerOn);
+      case "playback": return this._renderPlayback(vis.filter(b => b && cmds.includes(b.cmd)));
       case "dpad":   return this._renderDpad(group.buttons, cmds);
       case "keypad": return this._renderKeypad(group.buttons, cmds);
       default:       return this._renderRow(vis.filter(b => b && cmds.includes(b.cmd)));
@@ -961,6 +962,18 @@ class ZigbeeIrRemoteCard extends HTMLElement {
         return `<button class="${cls}" data-cmd="${b.cmd}" title="${title}">${inner}</button>`;
       }).join("")
     }</div>`;
+  }
+
+  _renderPlayback(vis) {
+    const trackCommands = new Set(["previous", "next"]);
+    const controls = vis.filter(button => !trackCommands.has(button.cmd));
+    const tracks = vis.filter(button => trackCommands.has(button.cmd));
+    const trackRow = tracks.length
+      ? `<div class="rmt-row playback-track-row">${tracks.map(button =>
+          `<button class="rmt-btn playback-track-btn" data-cmd="${button.cmd}" title="${button.label}">${iconHtml(button.icon)}</button>`
+        ).join("")}</div>`
+      : "";
+    return `${this._renderRow(controls)}${trackRow}`;
   }
 
   _renderDpad(allBtns, cmds) {
@@ -1250,6 +1263,11 @@ ha-card { overflow: hidden; border-radius: 12px; }
   justify-content: center;
   gap: 8px;
   width: 100%;
+}
+.playback-track-row { margin-top: 8px; }
+.playback-track-row .playback-track-btn {
+  flex: 1 1 120px;
+  max-width: 220px;
 }
 
 /* ── VDC zone ──────────────────────────────────────────────── */

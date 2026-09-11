@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4
+
+- Split remote-card playback controls across two rows, with wider Previous and
+  Next buttons on their own track-navigation row.
+
 ## 0.4.3
 
 - Version every JavaScript module imported by the sidebar manager so Home
