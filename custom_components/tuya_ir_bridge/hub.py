@@ -18,8 +18,8 @@ def validate_device(data, catalogue):
     if not isinstance(data, dict):
         raise ValueError("Device must be an object")
     allowed = {"name", "device_type", "topic", "protocol", "address", "commands", "model", "transport", "hvac_options", "min_temp", "max_temp", "temp_step", "hvac_modes", "fan_modes", "swing_modes", "feature_switches", "sleep_minutes", "initial_hvac_mode", "initial_target_temp", "precision", "temperature_unit", "away_temp", "mqtt_delay", "temperature_sensor", "humidity_sensor", "power_sensor", "availability_sensor", "availability_topic", "keep_mode_on_power_on", "ignore_off_temperature"}
-    if set(data) - allowed:
-        raise ValueError("Unknown device fields")
+    if unknown := set(data) - allowed:
+        raise ValueError(f"Unknown device fields: {', '.join(sorted(unknown))}")
     data = copy.deepcopy(data)
     for key in ("name", "device_type", "topic", "protocol"):
         if not isinstance(data.get(key), str) or not data[key].strip():

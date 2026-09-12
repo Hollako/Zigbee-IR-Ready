@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.7
+
+- Fix climate saves rejected with `Unknown device fields` by keeping the
+  frontend-only default swing controls inside `hvac_options` instead of sending
+  them as device fields.
+- Allowlist the editor values sent to the backend so UI helper values cannot
+  block sensor or availability-topic persistence.
+- Include offending field names in future backend validation errors.
+
 ## 0.4.6
 
 - Match the Tasmota IR Ready manager shell with Home Assistant's native menu

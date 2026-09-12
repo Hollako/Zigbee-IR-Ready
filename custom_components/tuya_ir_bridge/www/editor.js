@@ -38,7 +38,7 @@ export function mountEditor(panel,form,selected,values,capture) {
     const row=document.createElement('label');row.className='field-row';row.innerHTML=`<span class="field-label">${esc(label)}</span>`;let control;
     if(settings.options){control=document.createElement('select');for(const option of settings.options){const item=document.createElement('option');item.value=typeof option==='string'?option:option[0];item.textContent=typeof option==='string'?option:option[1];control.append(item);}}
     else {control=document.createElement('input');control.type=type;for(const [key,value] of Object.entries(settings.attrs||{}))control.setAttribute(key,value);}
-    control.className='field-input';control.name=name;control.value=values[name]??settings.default??'';row.append(control);container.append(row);extras[name]=()=>type==='number'?Number(control.value):control.value;return control;
+    control.className='field-input';control.name=name;control.value=values[name]??settings.default??'';row.append(control);container.append(row);if(settings.collect!==false)extras[name]=()=>type==='number'?Number(control.value):control.value;return control;
   }
   function addToggle(container,name,label){const row=document.createElement('label');row.className='toggle-row';row.innerHTML=`<span class="field-label">${esc(label)}</span><input type="checkbox" name="${name}" ${values[name]?'checked':''}><span class="toggle-track"></span><span data-toggle-value>${values[name]?'Yes':'No'}</span>`;const input=row.querySelector('input');input.onchange=()=>row.querySelector('[data-toggle-value]').textContent=input.checked?'Yes':'No';container.append(row);extras[name]=()=>input.checked;}
   function addEntity(container,name,label,filter){
@@ -74,8 +74,8 @@ export function mountEditor(panel,form,selected,values,capture) {
     checklist(behavior,'feature_switches','Toggle Features',features,[]);
     const help=document.createElement('p');help.className='help';help.textContent='Choose features your AC supports. Switches send the current AC state with the changed feature, and retain it for later commands. Unsupported features may be ignored by the protocol. Deselecting a switch makes it unavailable.';behavior.append(help);
     addField(behavior,'sleep_minutes','Sleep Value (minutes, 0 = default)','number',{default:0,attrs:{min:0,max:1440}});
-    const vertical=addField(behavior,'default_swing_v','Default Vertical Swing','text',{default:'Off',options:['Off','Auto','Highest','High','Middle','Low','Lowest']});
-    const horizontal=addField(behavior,'default_swing_h','Default Horizontal Swing','text',{default:'Off',options:['Off','Auto','Left Max','Left','Middle','Right','Right Max','Wide']});
+    const vertical=addField(behavior,'default_swing_v','Default Vertical Swing','text',{default:'Off',options:['Off','Auto','Highest','High','Middle','Low','Lowest'],collect:false});
+    const horizontal=addField(behavior,'default_swing_h','Default Horizontal Swing','text',{default:'Off',options:['Off','Auto','Left Max','Left','Middle','Right','Right Max','Wide'],collect:false});
     const defaults=document.createElement('div');defaults.className='choice-group';defaults.innerHTML='<span class="choice-title">Initial Feature Values</span><div class="choice-box"></div>';
     const hvacOptions=JSON.parse(field('hvac_options').value||'{}');vertical.value=hvacOptions.SwingV??'Off';horizontal.value=hvacOptions.SwingH??'Off';
     for(const key of features.filter(k=>!['SwingV','SwingH','Sleep'].includes(k))){const label=document.createElement('label');label.className='choice';label.innerHTML=`<input type="checkbox" data-default="${key}" ${hvacOptions[key]===true?'checked':''}><span>${esc(key)}</span>`;defaults.querySelector('.choice-box').append(label);}

@@ -103,6 +103,7 @@ test('climate save explicitly persists linked sensors and availability topic',as
     hvac_modes:['off','cool'],fan_modes:['auto'],swing_modes:[],feature_switches:[],
     initial_hvac_mode:'off',initial_target_temp:24,precision:.1,temperature_unit:'C',away_temp:0,mqtt_delay:0,
     sleep_minutes:0,keep_mode_on_power_on:false,ignore_off_temperature:false,hvac_options:{},
+    default_swing_v:'Auto',default_swing_h:'Off',frontend_only_value:'must not be submitted',
     temperature_sensor:'sensor.room_temperature',humidity_sensor:'sensor.room_humidity',
     power_sensor:'binary_sensor.ac_power',availability_topic:'  zigbee2mqtt/Bedroom/availability  ',
   });
@@ -118,4 +119,7 @@ test('climate save explicitly persists linked sensors and availability topic',as
   assert.equal(update.device.humidity_sensor,'sensor.room_humidity');
   assert.equal(update.device.power_sensor,'binary_sensor.ac_power');
   assert.equal(update.device.availability_topic,'zigbee2mqtt/Bedroom/availability');
+  assert.equal('default_swing_v' in update.device,false);
+  assert.equal('default_swing_h' in update.device,false);
+  assert.equal('frontend_only_value' in update.device,false);
 });

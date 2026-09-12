@@ -1,9 +1,9 @@
 /* Device manager; CSS reused under MIT from Tasmota IR Ready. */
 // Register the Lovelace card whenever the manager is opened as a fallback for
 // browsers that started before Home Assistant injected the global module URL.
-import './remote_card.js?v=0.4.6';
-import {CSS} from './panel.js?v=0.4.6';
-import {mountEditor} from './editor.js?v=0.4.6';
+import './remote_card.js?v=0.4.7';
+import {CSS} from './panel.js?v=0.4.7';
+import {mountEditor} from './editor.js?v=0.4.7';
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const errorText = error => {
   const detail = error?.error || error;
@@ -175,7 +175,8 @@ class ZigbeeIRPanel extends HTMLElement {
           device.model=Number(data.model); device.min_temp=Number(data.min_temp); device.max_temp=Number(data.max_temp); device.temp_step=Number(data.temp_step);
           device.hvac_options=JSON.parse(data.hvac_options.trim() || '{}');
           const editorData=this.editorValues?.() || {};
-          Object.assign(device,editorData);
+          const savedEditorFields=['hvac_modes','fan_modes','swing_modes','feature_switches','sleep_minutes','initial_hvac_mode','initial_target_temp','precision','temperature_unit','away_temp','mqtt_delay','temperature_sensor','humidity_sensor','power_sensor','availability_topic','keep_mode_on_power_on','ignore_off_temperature','hvac_options'];
+          for(const key of savedEditorFields)if(Object.hasOwn(editorData,key))device[key]=editorData[key];
           // These controls are created by the tab editor. Copy them
           // explicitly into every climate save so browser FormData behavior,
           // tab changes, or an empty selection cannot silently omit them.
