@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.8
+
+- Add transparent Zigbee IR Ready brand icons at 256×256 and 512×512 for HACS,
+  combining the IR blaster with the familiar glossy red Zigbee emblem.
+
 ## 0.4.7
 
 - Fix climate saves rejected with `Unknown device fields` by keeping the

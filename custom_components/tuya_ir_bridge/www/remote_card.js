@@ -27,7 +27,7 @@
  *       hidden_groups: [keypad, colors, channels]
  */
 
-const CARD_VERSION = "0.4.7";
+const CARD_VERSION = "0.4.8";
 const MAX_REMOTES  = 4;
 
 // ── Button group definitions ──────────────────────────────────────────────────
