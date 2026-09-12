@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.6
+
+- Match the Tasmota IR Ready manager shell with Home Assistant's native menu
+  button, an empty initial selection view, grouped device sidebar, and a compact
+  editor toolbar showing the selected device name.
+- Move Create and Save to the top-right toolbar and style Save with the Home
+  Assistant primary color and Delete with the error color.
+- Persist linked temperature, humidity and power sensors plus the Zigbee2MQTT
+  availability topic explicitly on every climate save. Keep stored sensor
+  selections visible when an entity is temporarily unavailable.
+
 ## 0.4.5
 
 - Constrain the wider Previous and Next row to the main remote-control width so

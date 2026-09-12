@@ -41,7 +41,16 @@ export function mountEditor(panel,form,selected,values,capture) {
     control.className='field-input';control.name=name;control.value=values[name]??settings.default??'';row.append(control);container.append(row);extras[name]=()=>type==='number'?Number(control.value):control.value;return control;
   }
   function addToggle(container,name,label){const row=document.createElement('label');row.className='toggle-row';row.innerHTML=`<span class="field-label">${esc(label)}</span><input type="checkbox" name="${name}" ${values[name]?'checked':''}><span class="toggle-track"></span><span data-toggle-value>${values[name]?'Yes':'No'}</span>`;const input=row.querySelector('input');input.onchange=()=>row.querySelector('[data-toggle-value]').textContent=input.checked?'Yes':'No';container.append(row);extras[name]=()=>input.checked;}
-  function addEntity(container,name,label,filter){const options=[['','— None —'],...Object.values(panel._hass.states||{}).filter(filter).sort((a,b)=>a.entity_id.localeCompare(b.entity_id)).map(state=>[state.entity_id,state.attributes?.friendly_name||state.entity_id])];return addField(container,name,label,'text',{options});}
+  function addEntity(container,name,label,filter){
+    const states=Object.values(panel._hass.states||{});
+    const options=[['','— None —'],...states.filter(filter).sort((a,b)=>a.entity_id.localeCompare(b.entity_id)).map(state=>[state.entity_id,state.attributes?.friendly_name||state.entity_id])];
+    const saved=values[name];
+    if(saved&&!options.some(([entityId])=>entityId===saved)){
+      const state=states.find(item=>item.entity_id===saved);
+      options.splice(1,0,[saved,`${state?.attributes?.friendly_name||saved} (saved; currently unavailable)`]);
+    }
+    return addField(container,name,label,'text',{options});
+  }
   if(climate){
     addField(connection,'mqtt_delay','MQTT Delay (seconds)','number',{default:0,attrs:{min:0,max:60,step:.1}});
     const domain=state=>state.entity_id.split('.')[0],deviceClass=state=>state.attributes?.device_class,unit=state=>state.attributes?.unit_of_measurement;
