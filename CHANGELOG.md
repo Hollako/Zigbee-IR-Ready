@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.9
+
+- Move the HACS brand icons into `custom_components/tuya_ir_bridge/brand/` so
+  they are installed inside the integration directory.
+
 ## 0.4.8
 
 - Add transparent Zigbee IR Ready brand icons at 256×256 and 512×512 for HACS,
